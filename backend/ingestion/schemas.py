@@ -1,33 +1,37 @@
+"""
+Schema for raw chunks produced by the ingestion stage. A RawChunk is
+the first structured representation of a source document or code file
+before any normalization or embedding takes place.
+"""
 from __future__ import annotations
 
 import uuid
-from abc import ABC, abstractmethod
-from typing import Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Annotated, Any, Literal, Union
 
-class RawChunk(BaseModel, ABC):
-    """A source-agnostic abstract representation of a parsed chunk"""
+from pydantic import BaseModel, Discriminator, Field, Tag
+
+
+class RawChunk(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    chunk_type: Literal["knowledge", "code"]
     source_file: str
     raw_text: str
     chunk_index: int = 0
-    metadata: dict[str, Any] = Field(default_factory=dict) # TODO maybe define schema for this
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @property
-    @abstractmethod
-    def chunk_type(self) -> str:
-        pass
 
 class RawKnowledgeChunk(RawChunk):
-    # TODO fields
+    chunk_type: Literal["knowledge"] = "knowledge"
 
-    @property
-    def chunk_type(self) -> str:
-        return "knowledge"
-    
+
 class RawCodeChunk(RawChunk):
-    # TODO fields
+    chunk_type: Literal["code"] = "code"
 
-    @property
-    def chunk_type(self) -> str:
-        return "code"
+
+AnnotatedRawChunk = Annotated[
+    Union[
+        Annotated[RawKnowledgeChunk, Tag("knowledge")],
+        Annotated[RawCodeChunk, Tag("code")],
+    ],
+    Discriminator("chunk_type"),
+]

@@ -1,0 +1,16 @@
+[project]
+name = "synapse-backend"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic==2.13.0",
+    "actian-vectorai @ file:actian_vectorai-0.1.0b2-py3-none-any.whl",
+    "pytest==9.0.3",
+]
+
+[tool.setuptools]
+packages = ["app", "embeddings", "ingestion", "normalization", "storage"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["*.py"]
