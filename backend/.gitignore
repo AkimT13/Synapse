@@ -1,6 +1,7 @@
 .venv
 *.egg-info/
 __pycache__/
+data/
 CLAUDE.md
 AGENTS.md
 CODESTYLE.md
