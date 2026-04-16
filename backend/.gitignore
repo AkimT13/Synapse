@@ -2,7 +2,9 @@
 *.egg-info/
 __pycache__/
 data/
+.env
 CLAUDE.md
 AGENTS.md
 CODESTYLE.md
 memory/
+actian_vectorai-0.1.0b2-py3-none-any.whl

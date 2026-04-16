@@ -21,19 +21,16 @@ def store():
         s.client.collections.delete(COLLECTION)
 
 
-def _make_chunk(id_: str, vector: list[float]) -> EmbeddedChunk:
+def _make_chunk(source_file: str, vector: list[float]) -> EmbeddedChunk:
     raw = RawKnowledgeChunk(
-        id=f"{id_}_raw",
-        source_file="test.md",
-        raw_text=f"raw text for {id_}",
+        source_file=source_file,
+        raw_text=f"raw text for {source_file}",
     )
     normalized = NormalizedChunk(
-        id=f"{id_}_norm",
         source_chunk=raw,
-        embed_text=f"text for {id_}",
+        embed_text=f"text for {source_file}",
     )
     return EmbeddedChunk(
-        id=id_,
         source_chunk=normalized,
         vector=vector,
         vector_model="test-model",
@@ -42,25 +39,25 @@ def _make_chunk(id_: str, vector: list[float]) -> EmbeddedChunk:
 
 
 def test_stored_chunks_survive_a_round_trip_through_the_vector_db(store: VectorStore):
-    a = _make_chunk("a", [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    b = _make_chunk("b", [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    c = _make_chunk("c", [0.9, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    a = _make_chunk("a.md", [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    b = _make_chunk("b.md", [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    c = _make_chunk("c.md", [0.9, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     store.upsert([a, b, c])
 
     results = store.search(a.vector, k=2)
 
     assert len(results) == 2
     assert isinstance(results[0], SearchResult)
-    assert results[0].chunk.embed_text == "text for a"
-    assert results[0].chunk.source_chunk.source_chunk.raw_text == "raw text for a"
+    assert results[0].chunk.embed_text == "text for a.md"
+    assert results[0].chunk.source_chunk.source_chunk.raw_text == "raw text for a.md"
 
 
 def test_nearest_neighbour_is_ranked_by_similarity(store: VectorStore):
-    a = _make_chunk("a", [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    b = _make_chunk("b", [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    a = _make_chunk("a.md", [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+    b = _make_chunk("b.md", [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     store.upsert([a, b])
 
     results = store.search(a.vector, k=2)
 
-    assert results[0].id == "a"
+    assert results[0].id == a.id
     assert results[0].score > results[1].score
