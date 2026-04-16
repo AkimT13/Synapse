@@ -45,58 +45,38 @@ def get_config() -> ModelConfig:
 
 
 def complete(system_prompt: str, user_prompt: str) -> str:
-    """Route a single-turn chat completion to the configured provider.
-
-    Parameters
-    ----------
-    system_prompt:
-        The system message that sets the assistant's behaviour.
-    user_prompt:
-        The user message to respond to.
-
-    Returns
-    -------
-    str
-        The assistant's reply text.
-    """
     config = get_config()
     match config.chat_provider:
         case "openai":
             from models.providers import openai as openai_provider
-
             return openai_provider.complete(
+                config.chat_model, system_prompt, user_prompt
+            )
+        case "ollama":
+            from models.providers import ollama as ollama_provider
+            return ollama_provider.complete(
                 config.chat_model, system_prompt, user_prompt
             )
         case _:
             raise ValueError(f"Unknown chat provider: {config.chat_provider}")
 
-
 def embed(texts: list[str]) -> list[list[float]]:
-    """Route an embedding request to the configured provider.
-
-    Parameters
-    ----------
-    texts:
-        One or more strings to embed.
-
-    Returns
-    -------
-    list[list[float]]
-        A list of embedding vectors, one per input text.
-    """
     config = get_config()
     match config.embedding_provider:
         case "openai":
             from models.providers import openai as openai_provider
-
             return openai_provider.embed(
                 config.embedding_model, texts, config.embedding_dimension
+            )
+        case "ollama":
+            from models.providers import ollama as ollama_provider
+            return ollama_provider.embed(
+                config.embedding_model, texts
             )
         case _:
             raise ValueError(
                 f"Unknown embedding provider: {config.embedding_provider}"
             )
-
 
 def embed_single(text: str) -> list[float]:
     """Convenience wrapper that embeds a single string and returns its vector."""
