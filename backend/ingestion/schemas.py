@@ -9,7 +9,7 @@ import uuid
 from abc import ABC
 from typing import Annotated, Any, Literal, Union
 
-from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
+from pydantic import BaseModel, Discriminator, Field, Tag, model_validator, ConfigDict
 
 
 # ---------------------------------------------------------------------------
@@ -33,6 +33,8 @@ class RawChunk(BaseModel, ABC):
     Abstract base for all raw chunk types.
     Not instantiated directly — use RawDocumentChunk or RawCodeChunk.
     """
+    model_config = ConfigDict(use_enum_values=True)
+
     id: str = ""
     chunk_type: Literal["knowledge", "code"]
     source_file: str
@@ -47,10 +49,6 @@ class RawChunk(BaseModel, ABC):
                 f"{self.chunk_type}::{self.source_file}::{self.chunk_index}::{self.raw_text}"
             )
         return self
-
-    class Config:
-        use_enum_values = True
-
 
 # ---------------------------------------------------------------------------
 # Knowledge chunks
