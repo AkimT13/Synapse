@@ -6,16 +6,22 @@ from the source NormalizedChunk, not duplicated.
 """
 from __future__ import annotations
 
-import uuid
+from pydantic import BaseModel, Field, model_validator
 
-from pydantic import BaseModel, Field
-
+from ingestion.schemas import deterministic_id
 from normalization.schemas import NormalizedChunk
 
 
 class EmbeddedChunk(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = ""
     source_chunk: NormalizedChunk
+
+    @model_validator(mode="after")
+    def _set_deterministic_id(self) -> EmbeddedChunk:
+        if not self.id:
+            self.id = deterministic_id(f"emb::{self.source_chunk.id}")
+        return self
+
     vector: list[float]
     vector_model: str
     vector_dimension: int
@@ -27,4 +33,3 @@ class EmbeddedChunk(BaseModel):
     @property
     def chunk_type(self) -> str:
         return self.source_chunk.chunk_type
-
