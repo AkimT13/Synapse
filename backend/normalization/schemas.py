@@ -6,17 +6,22 @@ Carries the full source RawChunk for provenance.
 """
 from __future__ import annotations
 
-import uuid
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
-from ingestion.schemas import AnnotatedRawChunk
+from ingestion.schemas import AnnotatedRawChunk, deterministic_id
 
 
 class NormalizedChunk(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    id: str = ""
     source_chunk: AnnotatedRawChunk
+
+    @model_validator(mode="after")
+    def _set_deterministic_id(self) -> NormalizedChunk:
+        if not self.id:
+            self.id = deterministic_id(f"norm::{self.source_chunk.id}")
+        return self
 
     kind: Literal[
         "constraint",
