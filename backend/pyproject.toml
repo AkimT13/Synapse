@@ -6,10 +6,11 @@ dependencies = [
     "pydantic==2.13.0",
     "actian-vectorai @ file:actian_vectorai-0.1.0b2-py3-none-any.whl",
     "pytest==9.0.3",
+    "docling",
 ]
 
 [tool.setuptools]
-packages = ["app", "embeddings", "ingestion", "normalization", "storage"]
+packages = ["app", "config", "embeddings", "ingestion", "normalization", "storage"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
