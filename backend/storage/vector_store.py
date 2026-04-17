@@ -35,6 +35,32 @@ class SearchResult:
     chunk: EmbeddedChunk
 
 
+def _reconstruct_chunk(raw: dict) -> EmbeddedChunk:
+    """Rebuild an EmbeddedChunk from its stored ``_raw`` payload.
+
+    The vector is not stored inside ``_raw`` (Actian indexes it
+    separately), so we inject an empty list. Downstream consumers read
+    the chunk's text and metadata — they never read the vector back.
+    """
+    return EmbeddedChunk(**raw, vector=[])
+
+
+async def _try_upsert_one(
+    async_client: AsyncVectorAIClient,
+    collection_name: str,
+    item,
+) -> bool:
+    """Upsert a single point, swallowing errors. Returns True on success."""
+    try:
+        await async_client.points.upsert(
+            collection_name,
+            [PointStruct(id=item.id, vector=item.vector, payload=item.payload)],
+        )
+        return True
+    except Exception:
+        return False
+
+
 def _build_filter(filters: dict) -> object:
     """Convert a flat dict of field: value pairs into an Actian Filter.
 
@@ -115,6 +141,14 @@ class VectorStore:
         return asyncio.run(self._upsert_with_batcher(chunks))
 
     async def _upsert_with_batcher(self, chunks: list[EmbeddedChunk]) -> int:
+        """Upsert via SmartBatcher, retrying failed batches item-by-item.
+
+        When a batch flush fails — typically because one chunk's payload
+        exceeds the DB's per-point limit — we retry each item in that
+        batch individually so the good chunks aren't lost along with the
+        bad. Chunks that still fail on their own are dropped silently;
+        the caller sees the drop through the returned count.
+        """
         stored = 0
 
         async with AsyncVectorAIClient(self._host) as async_client:
@@ -122,15 +156,16 @@ class VectorStore:
             async def flush(collection_name: str, items: list) -> None:
                 nonlocal stored
                 points = [
-                    PointStruct(
-                        id=item.id,
-                        vector=item.vector,
-                        payload=item.payload,
-                    )
+                    PointStruct(id=item.id, vector=item.vector, payload=item.payload)
                     for item in items
                 ]
-                await async_client.points.upsert(collection_name, points)
-                stored += len(items)
+                try:
+                    await async_client.points.upsert(collection_name, points)
+                    stored += len(items)
+                except Exception:
+                    for item in items:
+                        if await _try_upsert_one(async_client, collection_name, item):
+                            stored += 1
 
             config = BatcherConfig(
                 size_limit=BATCHER_SIZE_LIMIT,
@@ -149,7 +184,7 @@ class VectorStore:
                 )
                 futures.append(future)
 
-            await asyncio.gather(*futures)
+            await asyncio.gather(*futures, return_exceptions=True)
             await batcher.stop(flush_remaining=True)
 
         return stored
@@ -191,7 +226,7 @@ class VectorStore:
             SearchResult(
                 id=r.id,
                 score=r.score,
-                chunk=EmbeddedChunk(**r.payload["_raw"]),
+                chunk=_reconstruct_chunk(r.payload["_raw"]),
             )
             for r in results
         ]

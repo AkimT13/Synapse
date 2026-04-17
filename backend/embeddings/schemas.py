@@ -38,24 +38,19 @@ class EmbeddedChunk(BaseModel):
         return self.source_chunk.source_chunk.metadata
 
     def to_storage_record(self) -> dict:
-        source = self.source_chunk.source_chunk
-        norm = self.source_chunk
+        """Build the Actian payload.
 
-        record = {
-            "id": self.id,
+        Only fields used as filter predicates by the retrieval layer are
+        promoted to the top level. Everything else lives inside ``_raw``,
+        which round-trips the full EmbeddedChunk on read. The vector
+        itself is excluded from ``_raw`` because Actian already indexes
+        it separately — duplicating it here would push every chunk over
+        the DB's per-point size limit.
+        """
+        source = self.source_chunk.source_chunk
+        record: dict = {
             "chunk_type": self.chunk_type,
-            "source_file": source.source_file,
-            "chunk_index": source.chunk_index,
-            "vector": self.vector,
-            "vector_model": self.vector_model,
-            "vector_dimension": self.vector_dimension,
-            "embed_text": self.embed_text,
-            "raw_text": source.raw_text,
-            "kind": norm.kind,
-            "subject": norm.subject,
-            "keywords": norm.keywords,
-            "metadata": source.metadata,
-            "_raw": self.model_dump(mode="json")
+            "_raw": self.model_dump(mode="json", exclude={"vector"}),
         }
 
         if self.chunk_type == "knowledge":
@@ -63,18 +58,12 @@ class EmbeddedChunk(BaseModel):
                 "domain": source.metadata.get("domain", ""),
                 "knowledge_type": source.metadata.get("knowledge_type", "unknown"),
                 "contains_constraint": source.metadata.get("contains_constraint", False),
-                "constraint_name": source.metadata.get("constraint_name"),
-                "source_type": source.metadata.get("source_type", "unknown"),
                 "confidence": source.metadata.get("confidence", 0.0),
-                "section_heading": getattr(source, "section_heading", None),
-                "page_number": getattr(source, "page_number", None),
+                "source_type": source.metadata.get("source_type", "unknown"),
             })
-
-        if self.chunk_type == "code":
+        elif self.chunk_type == "code":
             record.update({
                 "language": getattr(source, "language", "unknown"),
-                "function_name": getattr(source, "name", None),
-                "class_name": getattr(source, "parent_class", None),
                 "module_path": getattr(source, "module_path", ""),
             })
 
