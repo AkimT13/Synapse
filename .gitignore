@@ -8,3 +8,4 @@ CODESTYLE.md
 memory/
 .env.*
 backend/.env*
+.claude
