@@ -1,16 +1,22 @@
 """Ollama provider for chat completions and embeddings."""
 from __future__ import annotations
 
+import os
+
 import httpx
 
 
-_BASE_URL = "http://localhost:11434"
+def _base_url() -> str:
+    """Read the Ollama server URL on every call so overrides in .env
+    take effect without a Python process restart. Trailing slashes are
+    stripped so callers can safely concatenate ``/api/...`` paths."""
+    return os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 
 def complete(model: str, system_prompt: str, user_prompt: str) -> str:
     """Send a chat completion request to the local Ollama server."""
     response = httpx.post(
-        f"{_BASE_URL}/api/chat",
+        f"{_base_url()}/api/chat",
         json={
             "model": model,
             "stream": False,
@@ -30,7 +36,7 @@ def embed(model: str, texts: list[str]) -> list[list[float]]:
     vectors = []
     for text in texts:
         response = httpx.post(
-            f"{_BASE_URL}/api/embeddings",
+            f"{_base_url()}/api/embeddings",
             json={"model": model, "prompt": text},
             timeout=60.0,
         )

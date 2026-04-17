@@ -7,6 +7,7 @@ import { ArrowRight, GitBranch, Layers, Network } from "lucide-react";
 import { CodeWindow } from "@/components/landing/CodeWindow";
 import { FeatureCard } from "@/components/landing/FeatureCard";
 import { MetricsTicker } from "@/components/landing/MetricsTicker";
+import { NetworkBackground } from "@/components/landing/NetworkBackground";
 import { workspace } from "@/lib/api";
 
 /* Landing page — ported from mockups/index.html into React + Tailwind.
@@ -64,7 +65,9 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-ink text-white">
+    <main className="relative min-h-screen overflow-x-hidden text-white">
+      {/* Ambient constellation — fixed layer, behind all content. */}
+      <NetworkBackground />
       <style jsx global>{`
         [data-reveal] {
           opacity: 0;
