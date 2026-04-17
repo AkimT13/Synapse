@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Synapse — the link between code and knowledge</title>
+  <meta name="description" content="Synapse ingests your source code and your domain documents into one shared vector space, so every function can find the spec that justifies it, and every spec can find its implementation." />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet"
+  />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            serif: ['"Instrument Serif"', 'serif'],
+            sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+          },
+          colors: {
+            ink: '#030303',
+            surface: '#080808',
+            violet: { DEFAULT: '#8B5CF6', glow: 'rgba(139,92,246,0.4)' },
+            cyan:   { DEFAULT: '#06B6D4', glow: 'rgba(6,182,212,0.4)' },
+            emerald: { DEFAULT: '#10B981' },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    :root {
+      --ease-snap: cubic-bezier(0.23, 1, 0.32, 1);
+    }
+
+    html { scroll-behavior: smooth; }
+    body {
+      background: #030303;
+      color: #fff;
+      font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    /* ---------- Ambient orbs ---------- */
+    .orb {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(80px);
+      pointer-events: none;
+      will-change: transform;
+    }
+    .orb--violet { background: rgba(139, 92, 246, 0.35); }
+    .orb--cyan   { background: rgba(6, 182, 212, 0.25); }
+    @keyframes orb-float-a {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); }
+      50%      { transform: translate3d(0,-28px,0) scale(1.06); }
+    }
+    @keyframes orb-float-b {
+      0%, 100% { transform: translate3d(0,0,0) scale(1); }
+      50%      { transform: translate3d(14px,24px,0) scale(1.04); }
+    }
+    .orb--a { animation: orb-float-a 11s var(--ease-snap) infinite; }
+    .orb--b { animation: orb-float-b 14s var(--ease-snap) infinite; }
+
+    /* ---------- Text shimmer ---------- */
+    .shimmer-text {
+      background: linear-gradient(90deg, #a78bfa 0%, #ffffff 40%, #ffffff 60%, #22d3ee 100%);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: shimmer 6s linear infinite;
+    }
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ---------- Shiny border button ---------- */
+    .shiny-border {
+      position: relative;
+      display: inline-block;
+      padding: 1px;
+      border-radius: 9999px;
+      overflow: hidden;
+      isolation: isolate;
+    }
+    .shiny-border::before {
+      content: '';
+      position: absolute;
+      inset: -80%;
+      background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        #8b5cf6 40%,
+        #06b6d4 50%,
+        transparent 60%
+      );
+      animation: spin-conic 4s linear infinite;
+      z-index: -1;
+    }
+    .shiny-border > .shiny-inner {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #0a0a0a;
+      color: #fff;
+      padding: 14px 32px;
+      border-radius: 9999px;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+      transition: color 0.3s var(--ease-snap);
+    }
+    .shiny-border:hover > .shiny-inner { color: #f5f3ff; }
+    @keyframes spin-conic { to { transform: rotate(360deg); } }
+
+    /* ---------- Glass ---------- */
+    .glass {
+      background: rgba(10, 10, 10, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+    }
+
+    /* ---------- Staggered hero entrance ---------- */
+    .rise {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: rise 1s var(--ease-snap) forwards;
+    }
+    .rise-1 { animation-delay: 0.15s; }
+    .rise-2 { animation-delay: 0.35s; }
+    .rise-3 { animation-delay: 0.55s; }
+    .rise-4 { animation-delay: 0.75s; }
+    .rise-5 { animation-delay: 1.00s; }
+    @keyframes rise {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---------- Scroll reveal ---------- */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.9s var(--ease-snap), transform 0.9s var(--ease-snap);
+    }
+    .reveal.in-view { opacity: 1; transform: translateY(0); }
+
+    /* ---------- Ticker ---------- */
+    .ticker-mask {
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+              mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    }
+    .ticker-track {
+      display: flex;
+      width: max-content;
+      gap: 4rem;
+      animation: ticker 40s linear infinite;
+    }
+    @keyframes ticker {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
+    /* ---------- Feature cards ---------- */
+    .feature-card {
+      position: relative;
+      border-radius: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.02);
+      padding: 40px;
+      transition: transform 0.6s var(--ease-snap),
+                  border-color 0.6s var(--ease-snap),
+                  background-color 0.6s var(--ease-snap),
+                  box-shadow 0.6s var(--ease-snap);
+    }
+    .feature-card:hover {
+      transform: translateY(-12px);
+      border-color: rgba(139, 92, 246, 0.40);
+      background: rgba(255, 255, 255, 0.035);
+      box-shadow: 0 0 40px -10px rgba(139, 92, 246, 0.35);
+    }
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.5s var(--ease-snap);
+    }
+    .feature-card:hover .feature-icon {
+      transform: scale(1.1) rotate(-4deg);
+    }
+
+    /* ---------- Status dot ---------- */
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 9999px;
+      background: #10B981;
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6);
+      animation: pulse-dot 2.4s var(--ease-snap) infinite;
+    }
+    @keyframes pulse-dot {
+      0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+      70%  { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* ---------- Syntax highlight tokens ---------- */
+    .tok-kw   { color: #c4b5fd; }
+    .tok-cls  { color: #67e8f9; }
+    .tok-str  { color: #6ee7b7; }
+    .tok-com  { color: #6b7280; font-style: italic; }
+    .tok-fn   { color: #e5e7eb; }
+    .tok-pun  { color: #9ca3af; }
+    .tok-var  { color: #ffffff; }
+
+    /* ---------- Utility ---------- */
+    .tracking-widest-2  { letter-spacing: 0.2em; }
+    .tracking-tightest  { letter-spacing: -0.035em; }
+    .lh-snug { line-height: 0.95; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+  </style>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+
+  <!-- ============== NAV PILL ============== -->
+  <nav class="fixed top-6 left-1/2 -translate-x-1/2 w-[95%] max-w-2xl z-50 glass rounded-full">
+    <div class="flex items-center justify-between pl-4 pr-2 py-2">
+      <a href="#top" class="flex items-center gap-2">
+        <span class="inline-block w-3.5 h-3.5 rounded-full" style="background: conic-gradient(from 180deg, #8b5cf6, #06b6d4, #8b5cf6); box-shadow: 0 0 12px -2px rgba(139,92,246,0.6);"></span>
+        <span class="font-serif text-xl leading-none tracking-tightest">Synapse</span>
+      </a>
+      <div class="hidden sm:flex items-center gap-6">
+        <a href="#features"    class="text-[11px] uppercase tracking-widest-2 text-neutral-400 hover:text-white transition-colors">Features</a>
+        <a href="#integration" class="text-[11px] uppercase tracking-widest-2 text-neutral-400 hover:text-white transition-colors">Integration</a>
+      </div>
+      <a href="https://github.com/AkimT13/Synapse" target="_blank" rel="noopener"
+         class="bg-white text-black rounded-full text-xs font-medium px-4 py-2 hover:bg-neutral-200 transition-colors">
+        GitHub →
+      </a>
+    </div>
+  </nav>
+
+  <!-- ============== HERO ============== -->
+  <header id="top" class="relative isolate pt-40 pb-28 sm:pt-48 sm:pb-36 px-6 overflow-hidden">
+
+    <!-- Radial gradient backdrop -->
+    <div aria-hidden="true" class="absolute inset-0 -z-10"
+         style="background:
+           radial-gradient(ellipse 900px 500px at 50% -5%, rgba(139,92,246,0.40), transparent 60%),
+           radial-gradient(ellipse 700px 400px at 0% 30%, rgba(6,182,212,0.10), transparent 60%);">
+    </div>
+
+    <!-- Ambient orbs -->
+    <div aria-hidden="true" class="orb orb--violet orb--a" style="width:420px; height:420px; top:-120px; left:50%; transform:translateX(-50%);"></div>
+    <div aria-hidden="true" class="orb orb--cyan orb--b"   style="width:320px; height:320px; top:180px; left:-80px;"></div>
+
+    <div class="relative mx-auto max-w-5xl text-center">
+
+      <!-- Kicker -->
+      <div class="rise rise-1 inline-flex items-center gap-2 glass rounded-full px-3 py-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-violet"></span>
+        <span class="text-[10px] uppercase tracking-widest-2 text-neutral-300">
+          Cross-modal retrieval · built on Actian VectorAI
+        </span>
+      </div>
+
+      <!-- Heading -->
+      <h1 class="rise rise-2 mt-8 font-serif text-white tracking-tightest lh-snug
+                 text-6xl sm:text-7xl md:text-8xl lg:text-[8.5rem]">
+        Your code and your docs,<br />
+        one <span class="shimmer-text italic">vector space</span>.
+      </h1>
+
+      <!-- Subtitle -->
+      <p class="rise rise-3 mx-auto mt-8 max-w-2xl text-lg text-neutral-400 leading-relaxed">
+        Synapse parses your source code and your domain documents, normalizes both to natural language, and embeds them side-by-side. Query with a function and find the spec that justifies it — query with prose and find the code that implements it.
+      </p>
+
+      <!-- CTAs -->
+      <div class="rise rise-4 mt-12 flex flex-col sm:flex-row items-center justify-center gap-6">
+        <a href="./app/onboarding.html" class="shiny-border">
+          <span class="shiny-inner">
+            Launch the demo
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M5 12h14M13 5l7 7-7 7"/>
+            </svg>
+          </span>
+        </a>
+        <a href="#features" class="group text-sm text-neutral-400 hover:text-white transition-colors inline-flex items-center gap-2">
+          See how it works
+          <span class="transition-transform group-hover:translate-x-1">→</span>
+        </a>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ============== METRICS TICKER ============== -->
+  <section class="relative border-y border-white/5 bg-black/40 py-5 overflow-hidden ticker-mask" aria-label="Technical specs">
+    <div class="ticker-track">
+      <!-- set A -->
+      <div class="flex items-center gap-16 px-8">
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Embedding</span><span class="font-mono text-sm text-white">text-embedding-3-large</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Dimension</span><span class="font-mono text-sm" style="color:#22d3ee;">3072</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Chunk Size</span><span class="font-mono text-sm text-white">512 tokens</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Distance</span><span class="font-mono text-sm text-white">cosine</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Vector DB</span><span class="font-mono text-sm" style="color:#a78bfa;">Actian VectorAI</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Formats</span><span class="font-mono text-sm text-white">PDF · DOCX · MD · HTML · PY</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Providers</span><span class="font-mono text-sm text-white">OpenAI · Ollama</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Stages</span><span class="font-mono text-sm" style="color:#22d3ee;">4</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Modalities</span><span class="font-mono text-sm" style="color:#a78bfa;">Code ↔ Knowledge</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">IDs</span><span class="font-mono text-sm text-white">SHA-256</span></div>
+      </div>
+      <!-- set B (duplicate for seamless loop) -->
+      <div class="flex items-center gap-16 px-8" aria-hidden="true">
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Embedding</span><span class="font-mono text-sm text-white">text-embedding-3-large</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Dimension</span><span class="font-mono text-sm" style="color:#22d3ee;">3072</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Chunk Size</span><span class="font-mono text-sm text-white">512 tokens</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Distance</span><span class="font-mono text-sm text-white">cosine</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Vector DB</span><span class="font-mono text-sm" style="color:#a78bfa;">Actian VectorAI</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Formats</span><span class="font-mono text-sm text-white">PDF · DOCX · MD · HTML · PY</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Providers</span><span class="font-mono text-sm text-white">OpenAI · Ollama</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Stages</span><span class="font-mono text-sm" style="color:#22d3ee;">4</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">Modalities</span><span class="font-mono text-sm" style="color:#a78bfa;">Code ↔ Knowledge</span></div>
+        <div class="flex items-baseline gap-3"><span class="font-mono text-[10px] uppercase tracking-widest-2 text-neutral-500">IDs</span><span class="font-mono text-sm text-white">SHA-256</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== FEATURES ============== -->
+  <section id="features" class="relative px-6 py-28 sm:py-36">
+    <div aria-hidden="true" class="orb orb--violet orb--a" style="width:360px; height:360px; top:200px; right:-120px;"></div>
+
+    <div class="relative mx-auto max-w-6xl">
+
+      <div class="reveal max-w-3xl">
+        <p class="font-mono text-[11px] uppercase tracking-widest-2 text-neutral-500">01 / The pipeline</p>
+        <h2 class="mt-4 font-serif tracking-tightest text-4xl sm:text-5xl md:text-6xl text-white lh-snug">
+          Two inputs. One searchable <span class="italic text-neutral-400">substrate</span>.
+        </h2>
+        <p class="mt-6 text-neutral-400 text-lg leading-relaxed max-w-2xl">
+          Code and documentation live in different grammars. Synapse collapses them into the same natural-language surface before embedding, so a query doesn't have to know which one it's looking for.
+        </p>
+      </div>
+
+      <div class="mt-16 grid gap-6 md:grid-cols-3">
+
+        <!-- Card 1 -->
+        <article class="feature-card reveal">
+          <div class="feature-icon" style="background: rgba(139, 92, 246, 0.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#c4b5fd" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+          </div>
+          <h3 class="mt-6 font-serif text-2xl text-white tracking-tight">Dual ingestion</h3>
+          <p class="mt-3 text-neutral-400 text-[15px] leading-relaxed">
+            Python source is parsed via AST — functions, signatures, decorators, docstrings preserved. PDFs, DOCX, Markdown and HTML flow through docling's hybrid chunker. One schema, two pipelines.
+          </p>
+          <div class="mt-6 pt-6 border-t border-white/5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest-2 text-neutral-500">
+            <span>ingestion / code + knowledge</span>
+          </div>
+        </article>
+
+        <!-- Card 2 -->
+        <article class="feature-card reveal">
+          <div class="feature-icon" style="background: rgba(6, 182, 212, 0.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#67e8f9" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v18"/>
+              <path d="M3 12h18"/>
+              <circle cx="12" cy="12" r="9"/>
+            </svg>
+          </div>
+          <h3 class="mt-6 font-serif text-2xl text-white tracking-tight">LLM-normalized chunks</h3>
+          <p class="mt-3 text-neutral-400 text-[15px] leading-relaxed">
+            Every function and every paragraph is rewritten into a natural-language description. Embeddings of code and prose land in the same region of the vector space — no retrieval gap between modalities.
+          </p>
+          <div class="mt-6 pt-6 border-t border-white/5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest-2 text-neutral-500">
+            <span>normalization · openai or ollama</span>
+          </div>
+        </article>
+
+        <!-- Card 3 -->
+        <article class="feature-card reveal">
+          <div class="feature-icon" style="background: rgba(16, 185, 129, 0.12);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 21l-4.35-4.35"/>
+              <circle cx="10.5" cy="10.5" r="7.5"/>
+              <path d="M7 10.5h7M10.5 7v7"/>
+            </svg>
+          </div>
+          <h3 class="mt-6 font-serif text-2xl text-white tracking-tight">Cross-modal retrieval</h3>
+          <p class="mt-3 text-neutral-400 text-[15px] leading-relaxed">
+            A single Actian VectorAI collection, cosine-ranked. Ask a code question and get the spec; ask a domain question and get the implementation. Payloads carry full lineage back to the source file.
+          </p>
+          <div class="mt-6 pt-6 border-t border-white/5 flex items-center gap-2 font-mono text-[11px] uppercase tracking-widest-2 text-neutral-500">
+            <span>storage · actian vectorai</span>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== CODE INTEGRATION ============== -->
+  <section id="integration" class="relative px-6 py-28 sm:py-36">
+    <div aria-hidden="true" class="orb orb--cyan orb--a" style="width:380px; height:380px; bottom:-80px; left:-60px;"></div>
+
+    <div class="relative mx-auto max-w-6xl grid gap-16 lg:grid-cols-[1fr_1.2fr] items-center">
+
+      <div class="reveal">
+        <p class="font-mono text-[11px] uppercase tracking-widest-2 text-neutral-500">02 / Integration</p>
+        <h2 class="mt-4 font-serif tracking-tightest text-4xl sm:text-5xl md:text-6xl text-white lh-snug">
+          Four lines from <span class="italic">repo</span> to retrieval.
+        </h2>
+        <p class="mt-6 text-neutral-400 text-lg leading-relaxed">
+          The ingestion job is a single object. Connect a <span class="font-mono text-white text-[15px]">VectorStore</span>, point it at a directory, and every function in the tree becomes a queryable vector with lineage intact.
+        </p>
+        <ul class="mt-8 space-y-3 text-neutral-400">
+          <li class="flex gap-3"><span class="text-violet mt-0.5">—</span>Deterministic SHA-256 IDs, so re-ingesting doesn't duplicate.</li>
+          <li class="flex gap-3"><span class="text-cyan mt-0.5">—</span>Batched upserts via Actian's <span class="font-mono text-white text-[14px]">SmartBatcher</span>.</li>
+          <li class="flex gap-3"><span class="text-emerald mt-0.5">—</span>Per-stage error capture — partial failure returns a usable <span class="font-mono text-white text-[14px]">JobResult</span>.</li>
+        </ul>
+      </div>
+
+      <!-- IDE window -->
+      <div class="reveal rounded-3xl border border-white/10 bg-[#080808]/80 overflow-hidden shadow-[0_30px_80px_-30px_rgba(139,92,246,0.25)]">
+        <!-- toolbar -->
+        <div class="flex items-center justify-between px-5 py-3 border-b border-white/5">
+          <div class="flex items-center gap-2">
+            <span class="w-3 h-3 rounded-full bg-red-500/60"></span>
+            <span class="w-3 h-3 rounded-full bg-yellow-500/60"></span>
+            <span class="w-3 h-3 rounded-full bg-emerald/60"></span>
+          </div>
+          <span class="font-mono text-[11px] text-neutral-500">jobs/ingest_code.py</span>
+          <button type="button" id="copyBtn"
+                  class="text-neutral-500 hover:text-white transition-colors"
+                  aria-label="Copy snippet">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15V5a2 2 0 0 1 2-2h10"/>
+            </svg>
+          </button>
+        </div>
+        <!-- code -->
+        <pre class="px-6 py-6 overflow-x-auto text-[13.5px] leading-relaxed font-mono"><code id="snippet"><span class="tok-kw">from</span> <span class="tok-var">storage.vector_store</span> <span class="tok-kw">import</span> <span class="tok-cls">VectorStore</span>
+<span class="tok-kw">from</span> <span class="tok-var">jobs.ingest_code</span>   <span class="tok-kw">import</span> <span class="tok-cls">CodeIngestionJob</span>
+
+<span class="tok-com"># Walk → normalize → embed → upsert, in one pass.</span>
+<span class="tok-kw">with</span> <span class="tok-cls">VectorStore</span><span class="tok-pun">()</span> <span class="tok-kw">as</span> store<span class="tok-pun">:</span>
+    result <span class="tok-pun">=</span> <span class="tok-cls">CodeIngestionJob</span><span class="tok-pun">(</span>store<span class="tok-pun">).</span><span class="tok-fn">run</span><span class="tok-pun">(</span><span class="tok-str">"/path/to/repo"</span><span class="tok-pun">)</span>
+    <span class="tok-fn">print</span><span class="tok-pun">(</span><span class="tok-str">f"stored </span><span class="tok-pun">{</span>result<span class="tok-pun">.</span>chunks_stored<span class="tok-pun">}</span><span class="tok-str"> chunks "</span>
+          <span class="tok-str">f"from </span><span class="tok-pun">{</span>result<span class="tok-pun">.</span>files_processed<span class="tok-pun">}</span><span class="tok-str"> files"</span><span class="tok-pun">)</span></code></pre>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============== FOOTER ============== -->
+  <footer class="relative border-t border-white/5 bg-[#050505] px-6 pt-20 pb-8 mt-12">
+    <div class="mx-auto max-w-6xl">
+      <div class="grid gap-12 md:grid-cols-4">
+
+        <!-- Brand col -->
+        <div class="md:col-span-2">
+          <div class="flex items-center gap-2">
+            <span class="inline-block w-3.5 h-3.5 rounded-full" style="background: conic-gradient(from 180deg, #8b5cf6, #06b6d4, #8b5cf6);"></span>
+            <span class="font-serif text-4xl tracking-tightest text-white">Synapse</span>
+          </div>
+          <p class="mt-4 max-w-sm text-neutral-400 text-[15px] leading-relaxed">
+            The link between your code and the knowledge that justifies it. Built for domain-specific engineering — where the spec matters as much as the implementation.
+          </p>
+        </div>
+
+        <!-- Explore -->
+        <div>
+          <h4 class="text-[10px] uppercase tracking-widest-2 text-neutral-500">Explore</h4>
+          <ul class="mt-5 space-y-3 text-sm text-neutral-300">
+            <li><a href="#features"    class="hover:text-white transition-colors">Features</a></li>
+            <li><a href="#integration" class="hover:text-white transition-colors">Integration</a></li>
+            <li><a href="#top"         class="hover:text-white transition-colors">Back to top</a></li>
+          </ul>
+        </div>
+
+        <!-- Project -->
+        <div>
+          <h4 class="text-[10px] uppercase tracking-widest-2 text-neutral-500">Project</h4>
+          <ul class="mt-5 space-y-3 text-sm text-neutral-300">
+            <li><a href="https://github.com/AkimT13/Synapse" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub repository</a></li>
+            <li><span class="text-neutral-400">Built at Actian VectorAI Hackathon '26</span></li>
+            <li><span class="text-neutral-400">by Akim Tarasov &amp; Aneesh Kumar</span></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="mt-16 pt-6 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <p class="text-[11px] text-neutral-500 font-mono tracking-wide">
+          © 2026 Synapse · Hackathon build
+        </p>
+        <div class="flex items-center gap-2 text-[11px] uppercase tracking-widest-2 text-neutral-400">
+          <span class="status-dot" aria-hidden="true"></span>
+          Demo live
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ============== SCRIPT ============== -->
+  <script>
+    // Scroll reveal
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          e.target.classList.add('in-view');
+          io.unobserve(e.target);
+        }
+      }
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+    // Copy snippet
+    const copyBtn = document.getElementById('copyBtn');
+    const snippet = document.getElementById('snippet');
+    if (copyBtn && snippet) {
+      copyBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(snippet.innerText);
+          const original = copyBtn.innerHTML;
+          copyBtn.innerHTML = '<span class="text-xs font-mono" style="color:#6ee7b7;">copied</span>';
+          setTimeout(() => { copyBtn.innerHTML = original; }, 1400);
+        } catch (_) { /* clipboard unavailable — ignore */ }
+      });
+    }
+  </script>
+
+</body>
+</html>

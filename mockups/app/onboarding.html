@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Set up · Synapse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital,wght@0,400;1,400&family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="./shared.css" rel="stylesheet" />
+  <style>
+    /* page-specific */
+    .onboarding {
+      position: relative;
+      min-height: calc(100vh - 56px);
+      padding: 72px 28px 120px;
+      overflow: hidden;
+    }
+    .onboarding .inner {
+      position: relative;
+      z-index: 2;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    .step-rail {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #737373;
+    }
+    .step {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step .num {
+      width: 22px; height: 22px;
+      border-radius: 9999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      border: 1px solid var(--line-strong);
+      color: #737373;
+      font-size: 10px;
+    }
+    .step.done .num { background: rgba(16, 185, 129, 0.12); border-color: rgba(16, 185, 129, 0.5); color: #6ee7b7; }
+    .step.active .num { background: rgba(139, 92, 246, 0.14); border-color: rgba(139, 92, 246, 0.5); color: #c4b5fd; }
+    .step.active { color: #fff; }
+    .step.done { color: #d4d4d4; }
+    .rail-sep {
+      width: 40px; height: 1px; background: var(--line);
+    }
+
+    h1.onb-title {
+      font-family: 'Instrument Serif', serif;
+      font-weight: 400;
+      font-size: clamp(40px, 5.4vw, 72px);
+      letter-spacing: -0.03em;
+      line-height: 1.02;
+      margin: 24px 0 12px;
+    }
+    h1.onb-title em { color: #c4b5fd; font-style: italic; }
+    .onb-sub {
+      max-width: 640px;
+      color: #a3a3a3;
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    .cards {
+      margin-top: 56px;
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1fr 1fr;
+    }
+    @media (max-width: 920px) {
+      .cards { grid-template-columns: 1fr; }
+    }
+
+    .upload-card {
+      position: relative;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,0.02);
+      padding: 28px;
+      overflow: hidden;
+    }
+    .upload-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background:
+        radial-gradient(ellipse 340px 160px at 50% -10%, var(--glow), transparent 70%);
+      pointer-events: none;
+      opacity: 0.7;
+    }
+    .upload-card.code    { --glow: rgba(139, 92, 246, 0.22); }
+    .upload-card.know    { --glow: rgba(6, 182, 212, 0.22); }
+
+    .card-kicker {
+      display: flex; align-items: center; gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: #737373;
+    }
+    .card-kicker .dot { width: 6px; height: 6px; border-radius: 9999px; }
+    .code .card-kicker .dot { background: var(--violet); }
+    .know .card-kicker .dot { background: var(--cyan); }
+    .card-title {
+      font-family: 'Instrument Serif', serif;
+      font-size: 32px;
+      letter-spacing: -0.025em;
+      line-height: 1.08;
+      margin: 12px 0 6px;
+    }
+    .card-desc { color: #a3a3a3; font-size: 14px; line-height: 1.55; }
+
+    .source-switch {
+      display: flex; gap: 4px;
+      margin: 22px 0 14px;
+      padding: 4px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      width: fit-content;
+    }
+    .source-switch button {
+      padding: 6px 12px;
+      border-radius: 7px;
+      background: transparent;
+      color: #a3a3a3;
+      font-size: 12px;
+      border: 0;
+      cursor: pointer;
+      transition: background-color .2s var(--ease-snap), color .2s var(--ease-snap);
+    }
+    .source-switch button.on {
+      background: rgba(255,255,255,0.06);
+      color: #fff;
+    }
+
+    .dropzone {
+      position: relative;
+      margin-top: 10px;
+      border: 1px dashed rgba(255,255,255,0.15);
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      color: #a3a3a3;
+      background: rgba(0,0,0,0.25);
+    }
+    .dropzone.done {
+      border-style: solid;
+      border-color: rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .dz-icon {
+      width: 40px; height: 40px;
+      border-radius: 12px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.04);
+      margin-bottom: 10px;
+      color: #d4d4d4;
+    }
+    .dropzone.done .dz-icon { background: rgba(16,185,129,0.12); color: #6ee7b7; }
+    .dz-title { color: #fff; font-weight: 500; font-size: 14px; }
+    .dz-meta  { color: #737373; font-size: 12px; margin-top: 4px; }
+
+    .file-list {
+      margin-top: 18px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .file-row {
+      display: grid;
+      grid-template-columns: 24px 1fr auto auto;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: 13px;
+    }
+    .file-row .fn { color: #e5e5e5; }
+    .file-row .sz { color: #737373; font-family: 'JetBrains Mono', monospace; font-size: 11px; }
+    .file-row .state {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #6ee7b7;
+    }
+    .file-row .ico { color: #737373; }
+
+    .stats {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .stat {
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.015);
+    }
+    .stat .label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #737373;
+    }
+    .stat .value {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      color: #fff;
+      margin-top: 4px;
+    }
+    .stat .value .u { color: #737373; font-size: 11px; margin-left: 4px; }
+
+    .footer-bar {
+      margin-top: 48px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px;
+      padding: 20px 24px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.015);
+    }
+    .footer-bar .lhs {
+      display: flex; align-items: center; gap: 14px;
+      color: #a3a3a3;
+      font-size: 13px;
+    }
+    .check-dot {
+      width: 22px; height: 22px;
+      border-radius: 9999px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+    }
+
+    .page-orb-a {
+      width: 520px; height: 520px;
+      top: -160px; right: -140px;
+      background: rgba(139, 92, 246, 0.18);
+    }
+    .page-orb-b {
+      width: 440px; height: 440px;
+      bottom: -200px; left: -160px;
+      background: rgba(6, 182, 212, 0.14);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ========== TOP BAR (minimal on this page) ========== -->
+  <header class="topbar" style="border-bottom: 1px solid var(--line);">
+    <a class="brand" href="../index.html">
+      <span class="brand-dot"></span>
+      <span class="brand-word">Synapse</span>
+    </a>
+    <div class="step-rail">
+      <span class="step done">
+        <span class="num">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        Source
+      </span>
+      <span class="rail-sep"></span>
+      <span class="step active">
+        <span class="num">2</span>
+        Ingest
+      </span>
+      <span class="rail-sep"></span>
+      <span class="step">
+        <span class="num">3</span>
+        Workspace
+      </span>
+    </div>
+    <div style="display:flex; align-items:center; gap:14px;">
+      <span class="status-pill"><span class="status-dot"></span> Mock session</span>
+      <span class="avatar">AK</span>
+    </div>
+  </header>
+
+  <!-- ========== PAGE ========== -->
+  <main class="onboarding">
+    <div aria-hidden="true" class="orb orb-violet page-orb-a"></div>
+    <div aria-hidden="true" class="orb orb-cyan page-orb-b"></div>
+
+    <div class="inner">
+
+      <p style="font-family:'JetBrains Mono',monospace; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color:#737373;">
+        Project setup / aerospace-fcs
+      </p>
+      <h1 class="onb-title">
+        Point Synapse at your <em>code</em><br/>and your <em>knowledge</em>.
+      </h1>
+      <p class="onb-sub">
+        Two sources, one collection. Connect a repository and drop your specifications, compliance docs, and internal wikis. Synapse normalizes everything to natural language before embedding, so a query doesn't have to know which modality it's looking for.
+      </p>
+
+      <div class="cards">
+
+        <!-- =================== CODE CARD =================== -->
+        <section class="upload-card code">
+          <div class="card-kicker"><span class="dot"></span> Source code · step 1</div>
+          <h2 class="card-title">Connect a repository</h2>
+          <p class="card-desc">Python, TypeScript, Go, Rust. Parsed via AST — signatures, decorators, and docstrings preserved.</p>
+
+          <div class="source-switch" role="tablist" aria-label="Source method">
+            <button type="button" class="on">Local folder</button>
+            <button type="button">GitHub URL</button>
+            <button type="button">Sample repo</button>
+          </div>
+
+          <div class="dropzone done">
+            <div class="dz-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="dz-title">aerospace-fcs/</div>
+            <div class="dz-meta">847 files · 14.2 MB · uploaded 12s ago</div>
+          </div>
+
+          <div class="file-list">
+            <div class="file-row">
+              <span class="ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              </span>
+              <span class="fn">controllers/ · signal/ · io/ · tests/ · main.py</span>
+              <span class="sz">847 files</span>
+              <span class="state">parsed</span>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="label">Files</div><div class="value">847</div></div>
+            <div class="stat"><div class="label">Functions</div><div class="value">3,492</div></div>
+            <div class="stat"><div class="label">Chunks</div><div class="value">14,218</div></div>
+          </div>
+        </section>
+
+        <!-- =================== KNOWLEDGE CARD =================== -->
+        <section class="upload-card know">
+          <div class="card-kicker"><span class="dot"></span> Knowledge · step 2</div>
+          <h2 class="card-title">Drop in your docs</h2>
+          <p class="card-desc">PDF, DOCX, Markdown, HTML, and plain text. Parsed via docling's hybrid chunker with structure-aware splits.</p>
+
+          <div class="source-switch" role="tablist" aria-label="Source method">
+            <button type="button" class="on">Drop files</button>
+            <button type="button">Paste URL</button>
+            <button type="button">From Drive</button>
+          </div>
+
+          <div class="dropzone done">
+            <div class="dz-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="dz-title">12 documents uploaded</div>
+            <div class="dz-meta">2.1 MB · all formats detected</div>
+          </div>
+
+          <div class="file-list">
+            <div class="file-row">
+              <span class="ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <span class="fn">DO-178C_Compliance_Guide.pdf</span>
+              <span class="sz">842 KB</span>
+              <span class="state">chunked</span>
+            </div>
+            <div class="file-row">
+              <span class="ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <span class="fn">ARP4754A_Design_Assurance.pdf</span>
+              <span class="sz">614 KB</span>
+              <span class="state">chunked</span>
+            </div>
+            <div class="file-row">
+              <span class="ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <span class="fn">FCS_Internal_Spec_v3.docx</span>
+              <span class="sz">312 KB</span>
+              <span class="state">chunked</span>
+            </div>
+            <div class="file-row">
+              <span class="ico">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              </span>
+              <span class="fn">IEEE-830_requirements.md + 8 more</span>
+              <span class="sz">342 KB</span>
+              <span class="state">chunked</span>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat"><div class="label">Documents</div><div class="value">12</div></div>
+            <div class="stat"><div class="label">Sections</div><div class="value">486</div></div>
+            <div class="stat"><div class="label">Chunks</div><div class="value">4,817</div></div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ========== Footer action bar ========== -->
+      <div class="footer-bar">
+        <div class="lhs">
+          <span class="check-dot">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          </span>
+          <span>
+            19,035 chunks embedded across one collection · <span style="color:#fff;">ready</span>
+          </span>
+        </div>
+        <a href="./code.html" class="shiny-border" aria-label="Open workspace">
+          <span class="shiny-inner">
+            Open workspace
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </span>
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+</body>
+</html>
