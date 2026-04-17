@@ -23,20 +23,20 @@ from normalization.schemas import NormalizedChunk
 # ---------------------------------------------------------------------------
 
 _KIND_PATTERNS: list[tuple[str, list[str]]] = [
+    ("definition", [
+        "defined as", "refers to", "is a", "means", "known as",
+    ]),
     ("constraint", [
         "must", "shall", "required", "limit", "maximum", "minimum",
         "threshold", "tolerance", "not exceed", "must not",
     ]),
+    ("behavior", [
+        "process", "compute", "calculate", "transform", "filter",
+        "operates", "functions", "performs", "produces", "outputs",
+    ]),
     ("procedure", [
         "step", "procedure", "process", "follow", "sequence",
         "first", "then", "finally", "instruction",
-    ]),
-    ("definition", [
-        "defined as", "refers to", "is a", "means", "known as",
-    ]),
-    ("behavior", [
-        "operates", "functions", "performs", "produces", "outputs",
-        "returns", "generates",
     ]),
     ("mapping", [
         "corresponds to", "maps to", "equivalent", "converted",
@@ -97,22 +97,21 @@ class KnowledgeNormalizer:
                 ))
         return results
 
-    def _maybe_rewrite(
-        self, template: str, chunk: RawDocumentChunk
-    ) -> str:
-        """Call LLM for domain-rich chunks, otherwise return template."""
+    def _maybe_rewrite(self, template: str, chunk: RawDocumentChunk) -> str:
+        
         if not self._should_use_llm or not has_domain_signals(chunk):
             return template
-
         try:
             user_prompt = build_user_prompt(template, chunk)
-            return models.complete(
+            result = models.complete(
                 system_prompt=SYSTEM_PROMPT,
                 user_prompt=user_prompt,
             )
-        except Exception:
-            return template
-
+            
+            return result
+        except Exception as e:
+            
+            return template    
 
 # ---------------------------------------------------------------------------
 # Kind inference

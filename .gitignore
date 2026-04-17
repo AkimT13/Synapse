@@ -7,3 +7,4 @@ AGENTS.md
 CODESTYLE.md
 memory/
 .env.*
+backend/.env*

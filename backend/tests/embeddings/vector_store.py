@@ -5,7 +5,7 @@ Requires a running Actian VectorAI DB on localhost:50051.
 import pytest
 
 from embeddings.schemas import EmbeddedChunk
-from ingestion.schemas import RawKnowledgeChunk
+from ingestion.schemas import RawDocumentChunk
 from normalization.schemas import NormalizedChunk
 from storage.vector_store import SearchResult, VectorStore
 
@@ -22,10 +22,10 @@ def store():
 
 
 def _make_chunk(source_file: str, vector: list[float]) -> EmbeddedChunk:
-    raw = RawKnowledgeChunk(
-        source_file=source_file,
-        raw_text=f"raw text for {source_file}",
-    )
+    raw = RawDocumentChunk.from_raw_text(
+    raw_text=f"raw text for {source_file}",
+    source_file=source_file,
+)
     normalized = NormalizedChunk(
         source_chunk=raw,
         embed_text=f"text for {source_file}",
