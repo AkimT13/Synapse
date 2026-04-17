@@ -9,3 +9,7 @@ memory/
 .env.*
 backend/.env*
 .claude
+node_modules/
+.next/
+next-env.d.ts
+.DS_Store
