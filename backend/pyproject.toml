@@ -31,4 +31,5 @@ testpaths = ["tests"]
 python_files = ["*.py"]
 markers = [
     "llm: marks tests that require a running LLM (deselect with -m 'not llm')",
+    "actian: marks tests that require a running Actian VectorAI instance (deselect with -m 'not actian')",
 ]

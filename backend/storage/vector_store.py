@@ -13,6 +13,8 @@ from actian_vectorai import (
     AsyncVectorAIClient,
     BatcherConfig,
     Distance,
+    Field,
+    FilterBuilder,
     PointStruct,
     SmartBatcher,
     VectorAIClient,
@@ -33,8 +35,37 @@ class SearchResult:
     chunk: EmbeddedChunk
 
 
-class VectorStore:
+def _build_filter(filters: dict) -> object:
+    """Convert a flat dict of field: value pairs into an Actian Filter.
 
+    All conditions are combined with must (AND logic).
+    String and bool values use equality match.
+    Dict values are treated as range conditions:
+        {"confidence": {"$gte": 0.8}}  →  Field("confidence").gte(0.8)
+    """
+    builder = FilterBuilder()
+
+    for field_name, value in filters.items():
+        if isinstance(value, dict):
+            for op, operand in value.items():
+                match op:
+                    case "$gte":
+                        builder.must(Field(field_name).gte(operand))
+                    case "$lte":
+                        builder.must(Field(field_name).lte(operand))
+                    case "$gt":
+                        builder.must(Field(field_name).gt(operand))
+                    case "$lt":
+                        builder.must(Field(field_name).lt(operand))
+                    case _:
+                        raise ValueError(f"Unsupported filter operator: {op}")
+        else:
+            builder.must(Field(field_name).eq(value))
+
+    return builder.build()
+
+
+class VectorStore:
     def __init__(
         self,
         host: str = "localhost:50051",
@@ -65,14 +96,19 @@ class VectorStore:
     @property
     def client(self) -> VectorAIClient:
         if self._client is None:
-            raise RuntimeError("Not connected — call .connect() or use as context manager")
+            raise RuntimeError(
+                "Not connected — call .connect() or use as context manager"
+            )
         return self._client
 
     def ensure_collection(self, dimension: int) -> None:
         if not self.client.collections.exists(self._collection):
             self.client.collections.create(
                 self._collection,
-                vectors_config=VectorParams(size=dimension, distance=self._distance),
+                vectors_config=VectorParams(
+                    size=dimension,
+                    distance=self._distance,
+                ),
             )
 
     def upsert(self, chunks: list[EmbeddedChunk]) -> int:
@@ -82,10 +118,15 @@ class VectorStore:
         stored = 0
 
         async with AsyncVectorAIClient(self._host) as async_client:
+
             async def flush(collection_name: str, items: list) -> None:
                 nonlocal stored
                 points = [
-                    PointStruct(id=item.id, vector=item.vector, payload=item.payload)
+                    PointStruct(
+                        id=item.id,
+                        vector=item.vector,
+                        payload=item.payload,
+                    )
                     for item in items
                 ]
                 await async_client.points.upsert(collection_name, points)
@@ -104,7 +145,7 @@ class VectorStore:
                     self._collection,
                     chunk.id,
                     chunk.vector,
-                    chunk.model_dump(),
+                    chunk.to_storage_record(),
                 )
                 futures.append(future)
 
@@ -113,17 +154,44 @@ class VectorStore:
 
         return stored
 
-    def search(self, vector: list[float], k: int = 5) -> list[SearchResult]:
+    def search(
+        self,
+        vector: list[float],
+        k: int = 5,
+        filters: dict | None = None,
+    ) -> list[SearchResult]:
+        """Search for the k nearest neighbours to the given vector.
+
+        Parameters
+        ----------
+        vector:
+            The query vector to search against.
+        k:
+            Number of results to return.
+        filters:
+            Optional dict of field: value pairs to filter candidates
+            before KNN search. All conditions are AND-ed together.
+            Filterable fields are promoted to top level in the storage
+            record by to_storage_record().
+
+            Examples:
+                {"chunk_type": "knowledge", "domain": "spectroscopy"}
+                {"chunk_type": "code", "language": "python"}
+                {"knowledge_type": "constraint", "confidence": {"$gte": 0.8}}
+        """
+        actian_filter = _build_filter(filters) if filters else None
+
         results = self.client.points.search(
             self._collection,
             vector=vector,
             limit=k,
+            filter=actian_filter,
         )
         return [
             SearchResult(
                 id=r.id,
                 score=r.score,
-                chunk=EmbeddedChunk(**r.payload),
+                chunk=EmbeddedChunk(**r.payload["_raw"]),
             )
             for r in results
         ]
