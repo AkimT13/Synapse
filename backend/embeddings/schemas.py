@@ -54,10 +54,14 @@ class EmbeddedChunk(BaseModel):
         }
 
         if self.chunk_type == "knowledge":
+            # Derive contains_constraint from the normalizer's inferred kind —
+            # the ingestion/metadata layer never sets this flag, so deriving
+            # it here is what actually makes the constraints-only filter
+            # work instead of silently matching nothing.
             record.update({
                 "domain": source.metadata.get("domain", ""),
                 "knowledge_type": source.metadata.get("knowledge_type", "unknown"),
-                "contains_constraint": source.metadata.get("contains_constraint", False),
+                "contains_constraint": self.source_chunk.kind == "constraint",
                 "confidence": source.metadata.get("confidence", 0.0),
                 "source_type": source.metadata.get("source_type", "unknown"),
             })

@@ -6,6 +6,10 @@ invocation, matching how the real system works:
   c2k   — query is a verbatim code chunk; find relevant knowledge
   k2c   — query is a verbatim knowledge chunk; find relevant code
 
+For c2k, Python source is parsed and normalized first so the query
+text lives in the same domain-English space as the stored knowledge
+chunks. Each normalized function runs through the pipeline independently.
+
 Each mode runs retrieval AND the matching LLM-backed pipeline so the
 full stack is exercised.
 
@@ -16,8 +20,8 @@ Requires:
 Usage::
 
     py -m app.retrieval free "how is the spike threshold set?"
-    py -m app.retrieval c2k "def detect_spikes(signal, sampling_rate, threshold_sigma=4.0): ..."
-    py -m app.retrieval k2c "Spike detection threshold must be 3 to 5 standard deviations below baseline"
+    py -m app.retrieval c2k  -f ../sample/code/spike_detection.py
+    py -m app.retrieval k2c  -f ../sample/knowledge/spike_detection_protocol.md
 """
 from __future__ import annotations
 
@@ -28,6 +32,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import models
+from ingestion.code.python_parser import PythonParser
+from normalization.code.normalizer import CodeNormalizer
 from retrieval.pipelines import (
     answer_question,
     check_code_against_constraints,
@@ -72,6 +78,24 @@ def _print_query(query: str) -> None:
     print(f"Query:\n{preview}\n")
 
 
+def _normalize_code_query(source: str) -> list[tuple[str, str]]:
+    """Parse ``source`` as Python and return (function_name, embed_text) pairs.
+
+    If ``source`` doesn't parse into any functions we treat it as an
+    already-chunk-sized query and pass it through unchanged — that
+    keeps inline snippets working.
+    """
+    raw_chunks = PythonParser().parse_file(source, file_path="<query>", module_path="<query>")
+    if not raw_chunks:
+        return [("inline", source)]
+    normalizer = CodeNormalizer(should_use_llm=True)
+    normalized = normalizer.normalize_batch(raw_chunks)
+    return [
+        (chunk.source_chunk.name or f"chunk_{index}", chunk.embed_text)
+        for index, chunk in enumerate(normalized)
+    ]
+
+
 def _run_free(query: str, store: VectorStore) -> None:
     _print_query(query)
     response = answer_question(query, store=store, k=TOP_K)
@@ -82,11 +106,21 @@ def _run_free(query: str, store: VectorStore) -> None:
 
 def _run_code_to_knowledge(query: str, store: VectorStore) -> None:
     _print_query(query)
-    response = check_code_against_constraints(query, store=store, k=TOP_K)
-    _print_results("relevant knowledge", response["constraints"])
-    print("\n--- LLM constraint analysis ---")
-    print(f"has_conflict: {response['has_conflict']}")
-    print(response["explanation"])
+    queries = _normalize_code_query(query)
+    print(f"Normalized into {len(queries)} code chunk(s).\n")
+
+    for name, embed_text in queries:
+        print(f"\n### {name}")
+        preview = embed_text.strip().replace("\n", " ")
+        if len(preview) > PREVIEW_CHARS:
+            preview = preview[:PREVIEW_CHARS] + "..."
+        print(f"    {preview}")
+
+        response = check_code_against_constraints(embed_text, store=store, k=TOP_K)
+        _print_results("relevant knowledge", response["constraints"])
+        label = "fallback" if response.get("used_fallback") else "constraints-only"
+        print(f"\n--- LLM analysis ({label}, has_conflict={response['has_conflict']}) ---")
+        print(response["explanation"])
 
 
 def _run_knowledge_to_code(query: str, store: VectorStore) -> None:
@@ -119,7 +153,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "mode",
         choices=["free", "c2k", "k2c"],
-        help="free = plain question; c2k = code → knowledge; k2c = knowledge → code",
+        help="free = plain question; c2k = code -> knowledge; k2c = knowledge -> code",
     )
     parser.add_argument(
         "query",

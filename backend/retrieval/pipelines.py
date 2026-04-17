@@ -64,11 +64,26 @@ def check_code_against_constraints(
         k=k,
     )
 
+    # Cascade: if no chunks were labelled as constraints, fall back to the
+    # full knowledge space so the developer still gets relevant context
+    # (definitions, procedures, background) to reason against.
+    used_fallback = False
+    if not results:
+        results = code_to_knowledge(
+            code_embed_text=code_embed_text,
+            store=store,
+            domain=domain,
+            constraints_only=False,
+            k=k,
+        )
+        used_fallback = True
+
     if not results:
         return {
             "constraints": [],
-            "explanation": "No relevant domain constraints found.",
+            "explanation": "No relevant domain knowledge found.",
             "has_conflict": False,
+            "used_fallback": used_fallback,
         }
 
     context = _format_knowledge_context(results)
@@ -84,6 +99,7 @@ def check_code_against_constraints(
         "constraints": results,
         "explanation": explanation,
         "has_conflict": _detect_conflict_signal(explanation),
+        "used_fallback": used_fallback,
     }
 
 

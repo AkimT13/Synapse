@@ -1,8 +1,8 @@
 """
 End-to-end smoke test. Runs the full pipeline against the sample data:
 
-  1. Ingest sample code      (../sample/code → code chunks)
-  2. Ingest sample knowledge (../sample/knowledge → knowledge chunks)
+  1. Ingest sample code      (../sample/code -> code chunks)
+  2. Ingest sample knowledge (../sample/knowledge -> knowledge chunks)
   3. Run a free-text query
   4. Run a code-to-knowledge query
   5. Run a knowledge-to-code query
@@ -25,8 +25,10 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 import models
+from ingestion.code.python_parser import PythonParser
 from jobs.ingest_code import CodeIngestionJob
 from jobs.ingest_knowledge import KnowledgeIngestionJob
+from normalization.code.normalizer import CodeNormalizer
 from retrieval.pipelines import (
     answer_question,
     check_code_against_constraints,
@@ -92,16 +94,27 @@ def _run_free(store: VectorStore) -> None:
 
 
 def _run_code_to_knowledge(store: VectorStore) -> None:
-    _section(f"Code → Knowledge: query = contents of {CODE_QUERY_FILE.name}")
-    query = CODE_QUERY_FILE.read_text(encoding="utf-8")
-    response = check_code_against_constraints(query, store=store, k=TOP_K)
-    _print_results("relevant knowledge", response["constraints"])
-    print(f"\n--- LLM analysis (has_conflict={response['has_conflict']}) ---")
-    print(response["explanation"])
+    _section(f"Code -> Knowledge: query = {CODE_QUERY_FILE.name}")
+    source = CODE_QUERY_FILE.read_text(encoding="utf-8")
+    raw_chunks = PythonParser().parse_file(
+        source,
+        file_path=str(CODE_QUERY_FILE),
+        module_path=CODE_QUERY_FILE.stem,
+    )
+    normalized = CodeNormalizer(should_use_llm=True).normalize_batch(raw_chunks)
+
+    for chunk in normalized:
+        function_name = chunk.source_chunk.name or "anonymous"
+        print(f"\n### {function_name}")
+        response = check_code_against_constraints(chunk.embed_text, store=store, k=TOP_K)
+        _print_results("relevant knowledge", response["constraints"])
+        label = "fallback" if response.get("used_fallback") else "constraints-only"
+        print(f"\n--- LLM analysis ({label}, has_conflict={response['has_conflict']}) ---")
+        print(response["explanation"])
 
 
 def _run_knowledge_to_code(store: VectorStore) -> None:
-    _section(f"Knowledge → Code: query = contents of {KNOWLEDGE_QUERY_FILE.name}")
+    _section(f"Knowledge -> Code: query = contents of {KNOWLEDGE_QUERY_FILE.name}")
     query = KNOWLEDGE_QUERY_FILE.read_text(encoding="utf-8")
     response = explain_constraint_coverage(query, store=store, k=TOP_K)
     _print_results("relevant code", response["code_chunks"])
