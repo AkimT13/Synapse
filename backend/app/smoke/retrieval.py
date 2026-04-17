@@ -19,9 +19,9 @@ Requires:
 
 Usage::
 
-    py -m app.retrieval free "how is the spike threshold set?"
-    py -m app.retrieval c2k  -f ../sample/code/spike_detection.py
-    py -m app.retrieval k2c  -f ../sample/knowledge/spike_detection_protocol.md
+    py -m app.smoke.retrieval free "how is the spike threshold set?"
+    py -m app.smoke.retrieval c2k  -f ../sample/code/spike_detection.py
+    py -m app.smoke.retrieval k2c  -f ../sample/knowledge/spike_detection_protocol.md
 """
 from __future__ import annotations
 

@@ -8,8 +8,8 @@ Requires:
 
 Usage::
 
-    python -m app.code_ingestion /path/to/repo
-    py -m app.code_ingestion ../sample/code
+    python -m app.smoke.code_ingestion /path/to/repo
+    py -m app.smoke.code_ingestion ../sample/code
 """
 from __future__ import annotations
 

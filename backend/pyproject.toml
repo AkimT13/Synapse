@@ -23,6 +23,7 @@ dependencies = [
 packages = [
     "api",
     "app",
+    "app.smoke",
     "config",
     "embeddings",
     "ingestion",

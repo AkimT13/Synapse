@@ -29,27 +29,35 @@ interface UploadCardProps {
   state: JobState;
   onFiles: (files: File[]) => void;
   accept?: string;
+  // Primary picker mode. When true, the click CTA opens a folder
+  // dialog (webkitdirectory); when false, a normal file dialog.
   folder?: boolean;
   multiple?: boolean;
   idleTitle: string;
   idleMeta: string;
   ctaLabel: string;
-  statLabels: [string, string, string];
+  // When set, a secondary picker button with this label appears next
+  // to the primary CTA — in the opposite mode to ``folder``. Used by
+  // the knowledge card to let users pick either individual files or a
+  // whole directory tree.
+  secondaryCtaLabel?: string;
+  statLabels: [string, string];
 }
 
-// Map the accumulated SSE messages + ack to the three stat values. For
-// an already-uploaded corpus we only know the file count on disk —
-// chunk counts aren't cheap to compute without re-ingesting — so the
-// non-file slots surface as `null` and render as em-dashes.
-function deriveStats(state: JobState): [number | null, number | null, number | null] {
+// Two stat boxes: file count + stored chunk count. The intermediate
+// "functions / sections" column was removed because it was only
+// populated immediately after a fresh ingest — when an already-uploaded
+// corpus rehydrated from disk, both slots collapsed to em-dashes and
+// offered no signal.
+function deriveStats(state: JobState): [number | null, number | null] {
   if (state.kind === "done") {
     const r = state.result;
-    return [r.files_processed, r.chunks_parsed, r.chunks_stored];
+    return [r.files_processed, r.chunks_stored];
   }
   if (state.kind === "already-uploaded") {
-    return [state.fileCount, null, null];
+    return [state.fileCount, state.chunkCount];
   }
-  return [0, 0, 0];
+  return [0, 0];
 }
 
 export function UploadCard({
@@ -68,11 +76,14 @@ export function UploadCard({
   idleTitle,
   idleMeta,
   ctaLabel,
+  secondaryCtaLabel,
   statLabels,
 }: UploadCardProps) {
   const inputId = `${variant}-input`;
+  const secondaryInputId = `${variant}-input-alt`;
   const [isDragging, setIsDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const secondaryInputRef = useRef<HTMLInputElement | null>(null);
 
   const stats = useMemo(() => deriveStats(state), [state]);
 
@@ -174,7 +185,7 @@ export function UploadCard({
           })}
         </div>
 
-        {/* Hidden input — shared across idle + drag */}
+        {/* Primary hidden input — matches ``folder`` mode. */}
         <input
           ref={inputRef}
           id={inputId}
@@ -191,6 +202,27 @@ export function UploadCard({
             e.target.value = "";
           }}
         />
+
+        {/* Secondary hidden input — opposite mode to the primary. An
+            <input> cannot be both a file- and folder-picker at once, so
+            we mount two and switch via the label htmlFor. */}
+        {secondaryCtaLabel ? (
+          <input
+            ref={secondaryInputRef}
+            id={secondaryInputId}
+            type="file"
+            // @ts-expect-error webkitdirectory isn't in the React HTMLInputElement typing
+            webkitdirectory={folder ? undefined : ""}
+            directory={folder ? undefined : ""}
+            multiple={multiple ?? true}
+            accept={folder ? accept : undefined}
+            className="hidden"
+            onChange={(e) => {
+              handleFileList(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        ) : null}
 
         {/* Dropzone */}
         <div
@@ -218,13 +250,21 @@ export function UploadCard({
                 {idleTitle}
               </div>
               <div className="mt-1 text-xs text-[#737373]">{idleMeta}</div>
-              <div className="mt-4 flex items-center justify-center gap-2">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <label
                   htmlFor={inputId}
                   className="btn btn-ghost cursor-pointer"
                 >
                   {ctaLabel}
                 </label>
+                {secondaryCtaLabel ? (
+                  <label
+                    htmlFor={secondaryInputId}
+                    className="btn btn-ghost cursor-pointer"
+                  >
+                    {secondaryCtaLabel}
+                  </label>
+                ) : null}
                 {state.kind === "error" ? (
                   <span className="text-xs text-[#fca5a5]">
                     {state.message}
@@ -316,16 +356,28 @@ export function UploadCard({
                         : ""
                     }`
                   : state.kind === "already-uploaded"
-                    ? `${state.fileCount} files already on disk · ready to query`
+                    ? `${state.fileCount} files on disk${
+                        state.chunkCount !== null
+                          ? ` · ${state.chunkCount.toLocaleString()} chunks indexed`
+                          : ""
+                      } · ready to query`
                     : ""}
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
                 <label
                   htmlFor={inputId}
                   className="btn btn-ghost cursor-pointer"
                 >
                   Replace
                 </label>
+                {secondaryCtaLabel ? (
+                  <label
+                    htmlFor={secondaryInputId}
+                    className="btn btn-ghost cursor-pointer"
+                  >
+                    {secondaryCtaLabel}
+                  </label>
+                ) : null}
               </div>
             </>
           ) : null}
@@ -352,7 +404,7 @@ export function UploadCard({
         ) : null}
 
         {/* Stats strip */}
-        <div className="mt-4 grid grid-cols-3 gap-3">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           {statLabels.map((label, i) => (
             <div
               key={label}

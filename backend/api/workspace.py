@@ -55,12 +55,28 @@ def _count_files(root: Path) -> int:
 
 
 @router.get("/stats", response_model=WorkspaceStats)
-def get_stats() -> WorkspaceStats:
+def get_stats(
+    store: VectorStore = Depends(get_vector_store),
+) -> WorkspaceStats:
+    # Counts come straight from the vector DB so they persist across
+    # sessions; a freshly started backend with on-disk uploads still
+    # reports the correct totals without re-ingesting. If the collection
+    # is missing or the DB hiccups we quietly fall back to None so the
+    # UI can render em-dashes instead of a misleading zero.
+    total_code: int | None
+    total_knowledge: int | None
+    try:
+        total_code = store.count({"chunk_type": "code"})
+        total_knowledge = store.count({"chunk_type": "knowledge"})
+    except Exception:
+        total_code = None
+        total_knowledge = None
+
     return WorkspaceStats(
         code_files=_count_files(CODE_UPLOADS_DIR),
         knowledge_files=_count_files(KNOWLEDGE_UPLOADS_DIR),
-        total_code_chunks=None,
-        total_knowledge_chunks=None,
+        total_code_chunks=total_code,
+        total_knowledge_chunks=total_knowledge,
     )
 
 

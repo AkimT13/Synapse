@@ -1,17 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, GitBranch, Layers, Network } from "lucide-react";
 
 import { CodeWindow } from "@/components/landing/CodeWindow";
 import { FeatureCard } from "@/components/landing/FeatureCard";
 import { MetricsTicker } from "@/components/landing/MetricsTicker";
+import { workspace } from "@/lib/api";
 
 /* Landing page — ported from mockups/index.html into React + Tailwind.
    Interactive bits: IntersectionObserver reveal-on-scroll + copy button. */
 
 export default function Home() {
+  // If the backend already has corpora on disk, the nav pill's primary
+  // CTA should go straight to the workspace. Otherwise it should point
+  // at onboarding so a first-time visitor can upload. We default to the
+  // onboarding link until stats resolve — it's the safe choice if the
+  // check fails.
+  const [workspaceHref, setWorkspaceHref] = useState<"/onboarding" | "/code">(
+    "/onboarding",
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    workspace
+      .stats()
+      .then((stats) => {
+        if (cancelled) return;
+        if (stats.code_files > 0 || stats.knowledge_files > 0) {
+          setWorkspaceHref("/code");
+        }
+      })
+      .catch(() => {
+        // Backend unreachable — leave as /onboarding.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Reveal-on-scroll: any element with data-reveal slides up when visible.
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -109,21 +137,19 @@ export default function Home() {
               Integration
             </a>
           </div>
-          <a
-            href="https://github.com"
-            target="_blank"
-            rel="noopener noreferrer"
+          <Link
+            href={workspaceHref}
             className="rounded-full bg-white px-4 py-2 text-xs font-medium text-black transition-colors hover:bg-neutral-200"
           >
-            GitHub →
-          </a>
+            Workspace →
+          </Link>
         </div>
       </nav>
 
       {/* ============== HERO ============== */}
       <header
         id="top"
-        className="relative isolate overflow-hidden px-6 pb-28 pt-40 sm:pb-36 sm:pt-48"
+        className="relative isolate overflow-hidden px-6 pb-28 pt-28 sm:pb-36 sm:pt-32"
       >
         {/* Radial gradient backdrop */}
         <div
@@ -161,7 +187,7 @@ export default function Home() {
           >
             <span className="h-1.5 w-1.5 rounded-full bg-violet" />
             <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-300">
-              Cross-modal retrieval · built on Actian VectorAI
+              Code and documentation · built on Actian VectorAI
             </span>
           </div>
 
@@ -170,9 +196,9 @@ export default function Home() {
             className="mt-8 animate-rise font-serif text-6xl leading-[0.95] tracking-[-0.035em] text-white sm:text-7xl md:text-8xl lg:text-[8.5rem]"
             style={{ animationDelay: "0.35s" }}
           >
-            Your code and your docs,
+            Your code. Your docs.
             <br />
-            one <span className="shimmer-text italic">vector space</span>.
+            <span className="shimmer-text italic">One search.</span>
           </h1>
 
           {/* Subtitle */}
@@ -180,10 +206,9 @@ export default function Home() {
             className="mx-auto mt-8 max-w-2xl animate-rise text-lg leading-relaxed text-neutral-400"
             style={{ animationDelay: "0.55s" }}
           >
-            Synapse parses your source code and your domain documents, normalizes
-            both to natural language, and embeds them side-by-side. Query with a
-            function and find the spec that justifies it — query with prose and
-            find the code that implements it.
+            Ask a question about your code and find the documentation behind it.
+            Ask a question about your documentation and find the code that
+            implements it. One place to search everything your team knows.
           </p>
 
           {/* CTAs */}
@@ -224,16 +249,16 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl">
           <div className="max-w-3xl" data-reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-500">
-              01 / The pipeline
+              01 / What it does
             </p>
             <h2 className="mt-4 font-serif text-4xl leading-[0.95] tracking-[-0.035em] text-white sm:text-5xl md:text-6xl">
-              Two inputs. One searchable{" "}
-              <span className="italic text-neutral-400">substrate</span>.
+              Two inputs. One{" "}
+              <span className="italic text-neutral-400">search</span>.
             </h2>
             <p className="mt-6 max-w-2xl text-lg leading-relaxed text-neutral-400">
-              Code and documentation live in different grammars. Synapse collapses
-              them into the same natural-language surface before embedding, so a
-              query doesn&apos;t have to know which one it&apos;s looking for.
+              Code and documentation speak different languages. Synapse brings
+              them together, so a single question finds the right answer —
+              wherever it&apos;s written.
             </p>
           </div>
 
@@ -242,27 +267,27 @@ export default function Home() {
               <FeatureCard
                 tone="violet"
                 icon={<GitBranch size={22} strokeWidth={1.8} />}
-                title="Dual ingestion"
-                body="Python source is parsed via AST — functions, signatures, decorators, docstrings preserved. PDFs, DOCX, Markdown and HTML flow through docling's hybrid chunker. One schema, two pipelines."
-                footer="ingestion / code + knowledge"
+                title="Drop in everything"
+                body="Point Synapse at your repository and your documentation. Both get indexed in minutes — no conversions, no manual mapping."
+                footer="code · documentation"
               />
             </div>
             <div data-reveal style={{ transitionDelay: "80ms" }}>
               <FeatureCard
                 tone="cyan"
                 icon={<Layers size={22} strokeWidth={1.8} />}
-                title="LLM-normalized chunks"
-                body="Every function and every paragraph is rewritten into a natural-language description. Embeddings of code and prose land in the same region of the vector space — no retrieval gap between modalities."
-                footer="normalization · openai or ollama"
+                title="Shared understanding"
+                body="Code and prose live in the same semantic space, so related ideas sit next to each other — whether they show up in a function or a spec."
+                footer="semantic search"
               />
             </div>
             <div data-reveal style={{ transitionDelay: "160ms" }}>
               <FeatureCard
                 tone="emerald"
                 icon={<Network size={22} strokeWidth={1.8} />}
-                title="Cross-modal retrieval"
-                body="A single Actian VectorAI collection, cosine-ranked. Ask a code question and get the spec; ask a domain question and get the implementation. Payloads carry full lineage back to the source file."
-                footer="storage · actian vectorai"
+                title="Search in any direction"
+                body="Highlight a function to find the spec behind it. Highlight a paragraph to find the code that implements it. Or just ask a question and get an answer with citations."
+                footer="built on actian vectorai"
               />
             </div>
           </div>
@@ -280,35 +305,27 @@ export default function Home() {
         <div className="relative mx-auto grid max-w-6xl items-center gap-16 lg:grid-cols-[1fr_1.2fr]">
           <div data-reveal>
             <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-neutral-500">
-              02 / Integration
+              02 / Plug it in
             </p>
             <h2 className="mt-4 font-serif text-4xl leading-[0.95] tracking-[-0.035em] text-white sm:text-5xl md:text-6xl">
-              Four lines from <span className="italic">repo</span> to retrieval.
+              Works with <span className="italic">what you have</span>.
             </h2>
             <p className="mt-6 text-lg leading-relaxed text-neutral-400">
-              The ingestion job is a single object. Connect a{" "}
-              <span className="font-mono text-[15px] text-white">VectorStore</span>
-              , point it at a directory, and every function in the tree becomes a
-              queryable vector with lineage intact.
+              Connect your codebase and your documentation, and Synapse handles
+              the rest. No new formats to learn, no workflow to redesign.
             </p>
             <ul className="mt-8 space-y-3 text-neutral-400">
               <li className="flex gap-3">
                 <span className="mt-0.5 text-violet">—</span>
-                Deterministic SHA-256 IDs, so re-ingesting doesn&apos;t duplicate.
+                Re-run anytime as your project evolves.
               </li>
               <li className="flex gap-3">
                 <span className="mt-0.5 text-cyan">—</span>
-                Batched upserts via Actian&apos;s{" "}
-                <span className="font-mono text-[14px] text-white">
-                  SmartBatcher
-                </span>
-                .
+                Scales cleanly from a single repo to the whole organization.
               </li>
               <li className="flex gap-3">
                 <span className="mt-0.5 text-emerald">—</span>
-                Per-stage error capture — partial failure returns a usable{" "}
-                <span className="font-mono text-[14px] text-white">JobResult</span>
-                .
+                Transparent progress, clear results.
               </li>
             </ul>
           </div>
@@ -337,9 +354,8 @@ export default function Home() {
                 </span>
               </div>
               <p className="mt-4 max-w-sm text-[15px] leading-relaxed text-neutral-400">
-                The link between your code and the knowledge that justifies it.
-                Built for domain-specific engineering — where the spec matters as
-                much as the implementation.
+                One place to search everything your team knows. Built for work
+                where the spec matters as much as the code.
               </p>
             </div>
 

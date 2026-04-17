@@ -1,14 +1,14 @@
 const METRICS: Array<{ label: string; value: string; tone?: "cyan" | "violet" }> = [
-  { label: "Embedding", value: "text-embedding-3-large" },
-  { label: "Dimension", value: "3072", tone: "cyan" },
-  { label: "Chunk Size", value: "512 tokens" },
-  { label: "Distance", value: "cosine" },
-  { label: "Vector DB", value: "Actian VectorAI", tone: "violet" },
+  { label: "Search", value: "Cross-modal", tone: "violet" },
+  { label: "Citations", value: "Inline" },
   { label: "Formats", value: "PDF · DOCX · MD · HTML · PY" },
-  { label: "Providers", value: "OpenAI · Ollama" },
-  { label: "Stages", value: "4", tone: "cyan" },
-  { label: "Modalities", value: "Code ↔ Knowledge", tone: "violet" },
-  { label: "IDs", value: "SHA-256" },
+  { label: "Direction", value: "Code ↔ Knowledge", tone: "cyan" },
+  { label: "Retrieval", value: "Semantic" },
+  { label: "Results", value: "Relevance-scored" },
+  { label: "Vector DB", value: "Actian VectorAI", tone: "violet" },
+  { label: "Ingestion", value: "One-click" },
+  { label: "Navigation", value: "Deep-linked", tone: "cyan" },
+  { label: "Answers", value: "Grounded" },
 ];
 
 function MetricSet({ ariaHidden = false }: { ariaHidden?: boolean }) {

@@ -8,8 +8,8 @@ Requires:
 
 Usage::
 
-    python -m app.knowledge_ingestion /path/to/docs
-    py -m app.knowledge_ingestion ../sample/knowledge
+    python -m app.smoke.knowledge_ingestion /path/to/docs
+    py -m app.smoke.knowledge_ingestion ../sample/knowledge
 """
 from __future__ import annotations
 

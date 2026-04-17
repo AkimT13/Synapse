@@ -16,7 +16,7 @@ Requires:
 
 Usage::
 
-    python -m app.smoke_test
+    python -m app.smoke.smoke_test
 """
 from __future__ import annotations
 

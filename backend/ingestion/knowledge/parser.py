@@ -9,6 +9,8 @@ from pathlib import Path
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import ConversionResult, DocumentConverter
 
+from ingestion.walker import iter_files
+
 # File extension → docling InputFormat
 _EXT_TO_FORMAT: dict[str, InputFormat] = {
     ".pdf": InputFormat.PDF,
@@ -44,7 +46,11 @@ def parse_document(file_path: str | Path) -> ConversionResult:
 
 
 def parse_directory(dir_path: str | Path) -> list[ConversionResult]:
-    """Parse all supported documents in a directory (non-recursive).
+    """Parse every supported document in a directory tree, recursively.
+
+    Sub-directories are walked depth-first via
+    :func:`ingestion.walker.iter_files`, which filters out the usual
+    noise (``.git``, ``node_modules``, etc.) and by extension.
 
     Raises:
         FileNotFoundError: If *dir_path* does not exist or is not a directory.
@@ -52,8 +58,7 @@ def parse_directory(dir_path: str | Path) -> list[ConversionResult]:
     path = Path(dir_path)
     if not path.is_dir():
         raise FileNotFoundError(f"Directory not found: {path}")
-    results: list[ConversionResult] = []
-    for child in sorted(path.iterdir()):
-        if child.is_file() and child.suffix.lower() in _EXT_TO_FORMAT:
-            results.append(parse_document(child))
-    return results
+    files = sorted(
+        iter_files(path, extensions=list(_EXT_TO_FORMAT.keys()))
+    )
+    return [parse_document(child) for child in files]

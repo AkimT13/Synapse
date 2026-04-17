@@ -34,3 +34,22 @@ def test_ingest_directory_returns_chunks_from_all_documents(
     # Chunks should reference both source files
     sources = {c.source_file for c in chunks}
     assert len(sources) == 2
+
+
+def test_ingest_directory_walks_subdirectories(
+    sample_pdf: Path,
+    tmp_path: Path,
+) -> None:
+    # A user-uploaded folder can be nested — the pipeline must recurse.
+    shutil.copy(sample_pdf, tmp_path / "top.pdf")
+    (tmp_path / "specs" / "regulatory").mkdir(parents=True)
+    shutil.copy(sample_pdf, tmp_path / "specs" / "regulatory" / "nested.pdf")
+    # Default-excluded directory: must not be walked.
+    (tmp_path / ".git").mkdir()
+    shutil.copy(sample_pdf, tmp_path / ".git" / "ignored.pdf")
+
+    chunks = ingest_directory(tmp_path)
+    sources = {c.source_file for c in chunks}
+    assert any(s.endswith("top.pdf") for s in sources)
+    assert any(s.endswith("nested.pdf") for s in sources)
+    assert not any(".git" in s for s in sources)

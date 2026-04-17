@@ -230,3 +230,17 @@ class VectorStore:
             )
             for r in results
         ]
+
+    def count(self, filters: dict | None = None) -> int:
+        """Count points in the collection, optionally filtered.
+
+        Returns 0 if the collection does not exist yet, so callers can
+        invoke this on a fresh workspace without pre-checking existence.
+        """
+        if not self.client.collections.exists(self._collection):
+            return 0
+        actian_filter = _build_filter(filters) if filters else None
+        return self.client.points.count(
+            self._collection,
+            filter=actian_filter,
+        )

@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import {
   ingestCode,
   ingestJobStreamUrl,
   ingestKnowledge,
   workspace,
 } from "@/lib/api";
+import { useChat } from "@/lib/stores";
 import { UploadCard } from "@/components/onboarding/UploadCard";
 import type { IngestionDoneResult, JobState } from "@/components/onboarding/types";
 
@@ -50,7 +51,11 @@ export default function OnboardingPage() {
         if (stats.code_files > 0) {
           setCodeState((current) =>
             current.kind === "idle"
-              ? { kind: "already-uploaded", fileCount: stats.code_files }
+              ? {
+                  kind: "already-uploaded",
+                  fileCount: stats.code_files,
+                  chunkCount: stats.total_code_chunks ?? null,
+                }
               : current,
           );
         }
@@ -60,6 +65,7 @@ export default function OnboardingPage() {
               ? {
                   kind: "already-uploaded",
                   fileCount: stats.knowledge_files,
+                  chunkCount: stats.total_knowledge_chunks ?? null,
                 }
               : current,
           );
@@ -189,12 +195,54 @@ export default function OnboardingPage() {
     knowledgeState.kind === "already-uploaded";
   const bothDone = codeReady && knowledgeReady;
 
+  // --- workspace reset ----------------------------------------------------
+  // Nukes both upload corpora on disk, drops the vector collection, and
+  // clears chat history on the backend. Mirrors the state locally: close
+  // any live SSE, reset both cards to idle, and forget the active chat
+  // so the ask page doesn't surface a 404 for a conversation that no
+  // longer exists.
+  const { setActive: setActiveChat } = useChat();
+  const [isResetting, setIsResetting] = useState(false);
+  const handleReset = useCallback(async () => {
+    if (isResetting) return;
+    const confirmed = window.confirm(
+      "Reset the workspace? This deletes all uploaded code, all uploaded documents, the vector index, and every chat. It cannot be undone.",
+    );
+    if (!confirmed) return;
+    setIsResetting(true);
+    try {
+      codeEsRef.current?.close();
+      knowledgeEsRef.current?.close();
+      codeEsRef.current = null;
+      knowledgeEsRef.current = null;
+
+      await workspace.reset();
+
+      setCodeState({ kind: "idle" });
+      setKnowledgeState({ kind: "idle" });
+      setActiveChat(null);
+    } catch (err) {
+      window.alert(
+        `Reset failed: ${err instanceof Error ? err.message : "unknown error"}`,
+      );
+    } finally {
+      setIsResetting(false);
+    }
+  }, [isResetting, setActiveChat]);
+
   const totalChunks = useMemo(() => {
-    const c = codeState.kind === "done" ? codeState.result.chunks_stored : 0;
+    const c =
+      codeState.kind === "done"
+        ? codeState.result.chunks_stored
+        : codeState.kind === "already-uploaded"
+          ? codeState.chunkCount ?? 0
+          : 0;
     const k =
       knowledgeState.kind === "done"
         ? knowledgeState.result.chunks_stored
-        : 0;
+        : knowledgeState.kind === "already-uploaded"
+          ? knowledgeState.chunkCount ?? 0
+          : 0;
     return c + k;
   }, [codeState, knowledgeState]);
 
@@ -203,7 +251,12 @@ export default function OnboardingPage() {
       {/* ===== Top bar ===== */}
       <header
         className="topbar"
-        style={{ borderBottom: "1px solid var(--line)" }}
+        style={{
+          borderBottom: "1px solid var(--line)",
+          minHeight: 80,
+          paddingTop: 16,
+          paddingBottom: 16,
+        }}
       >
         <Link className="brand" href="/">
           <span className="brand-dot" />
@@ -215,6 +268,20 @@ export default function OnboardingPage() {
         />
 
         <div className="flex items-center gap-3.5">
+          <button
+            type="button"
+            onClick={handleReset}
+            disabled={isResetting}
+            aria-label="Reset workspace"
+            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#a3a3a3] transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {isResetting ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RotateCcw size={12} />
+            )}
+            {isResetting ? "Resetting…" : "Reset"}
+          </button>
           <span className="status-pill">
             <span className="status-dot" />
             Live session
@@ -224,7 +291,7 @@ export default function OnboardingPage() {
       </header>
 
       {/* ===== Page ===== */}
-      <main className="relative overflow-hidden px-7 pt-[72px] pb-[120px]" style={{ minHeight: "calc(100vh - 56px)" }}>
+      <main className="relative overflow-hidden px-7 pt-[72px] pb-[120px]" style={{ minHeight: "calc(100vh - 80px)" }}>
         <div
           aria-hidden
           className="orb orb-violet"
@@ -259,9 +326,7 @@ export default function OnboardingPage() {
           </h1>
           <p className="max-w-[640px] text-base leading-[1.6] text-[#a3a3a3]">
             Two sources, one collection. Connect a repository and drop your
-            specifications, compliance docs, and internal wikis. Synapse
-            normalizes everything to natural language before embedding, so a
-            query doesn&apos;t have to know which modality it&apos;s looking for.
+            specifications, compliance docs, and internal wikis.
           </p>
 
           {/* Cards */}
@@ -285,7 +350,7 @@ export default function OnboardingPage() {
               idleTitle="drop your repo here"
               idleMeta="or pick a folder — we preserve the tree via webkitdirectory"
               ctaLabel="Pick a folder"
-              statLabels={["Files", "Functions", "Chunks"]}
+              statLabels={["Files", "Chunks"]}
             />
 
             <UploadCard
@@ -304,10 +369,11 @@ export default function OnboardingPage() {
               onFiles={handleKnowledgeFiles}
               accept=".pdf,.docx,.md,.txt,.html"
               multiple
-              idleTitle="drop files to ingest"
-              idleMeta="PDF, DOCX, Markdown, HTML, TXT — structure detected automatically"
+              idleTitle="drop files or a folder"
+              idleMeta="PDF, DOCX, Markdown, HTML, TXT — nested folders walked automatically"
               ctaLabel="Pick files"
-              statLabels={["Documents", "Sections", "Chunks"]}
+              secondaryCtaLabel="Pick a folder"
+              statLabels={["Documents", "Chunks"]}
             />
           </div>
 

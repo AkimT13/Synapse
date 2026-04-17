@@ -55,7 +55,7 @@ To exercise the whole pipeline from the command line:
 
 ```bash
 cd backend
-python -m app.smoke_test
+python -m app.smoke.smoke_test
 ```
 
 This ingests the sample corpora, runs each retrieval direction, and prints
