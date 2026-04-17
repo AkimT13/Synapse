@@ -11,7 +11,17 @@ from retrieval.schemas import RetrievalResult
 from storage.vector_store import VectorStore
 
 
-_CONFLICT_SYSTEM_PROMPT = """\
+_CITATION_RULE = (
+    "- When you use information from a specific source, cite it inline with "
+    "the notation [N], where N is the 1-based index shown in brackets at the "
+    "start of each context item. Cite after the claim it supports, e.g. "
+    "\"the threshold must be 4 sigma below baseline [2]\". You may cite the "
+    "same source multiple times. Do not invent indices beyond those in the "
+    "context."
+)
+
+
+_CONFLICT_SYSTEM_PROMPT = f"""\
 You are an assistant that explains relationships between source code and \
 domain knowledge constraints. Given a code description and a set of \
 relevant domain knowledge chunks, identify any conflicts, gaps, or \
@@ -27,9 +37,10 @@ Rules:
 - Write in plain English suitable for a software developer.
 - Do NOT use bullet points. Write in prose.
 - Keep the response to 3-5 sentences.
+{_CITATION_RULE}
 """
 
-_SCIENTIST_SYSTEM_PROMPT = """\
+_SCIENTIST_SYSTEM_PROMPT = f"""\
 You are an assistant that explains software behavior to domain experts \
 who are not software developers. Given a domain constraint and a set of \
 relevant code chunks, explain in plain language whether the software \
@@ -42,7 +53,16 @@ Rules:
 - If the software appears to violate the constraint, explain the
   practical consequence.
 - Keep the response to 3-5 sentences.
+{_CITATION_RULE}
 """
+
+_ANSWER_SYSTEM_PROMPT = (
+    "You are an assistant that answers questions about a software "
+    "codebase and its domain knowledge. Use the provided context from "
+    "both source code and domain documents to answer the question "
+    "clearly and concisely.\n\n"
+    f"{_CITATION_RULE}"
+)
 
 
 def check_code_against_constraints(
@@ -161,12 +181,7 @@ def answer_question(
 
     context = _format_mixed_context(results)
     answer = models.complete(
-        system_prompt=(
-            "You are an assistant that answers questions about a software "
-            "codebase and its domain knowledge. Use the provided context "
-            "from both source code and domain documents to answer the "
-            "question clearly and concisely."
-        ),
+        system_prompt=_ANSWER_SYSTEM_PROMPT,
         user_prompt=f"Question: {question}\n\nContext:\n{context}",
     )
 
