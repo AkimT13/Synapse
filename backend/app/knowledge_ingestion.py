@@ -1,6 +1,6 @@
 """
-Run the full code ingestion pipeline: parse → normalize (with LLM) →
-embed → store in Actian VectorAI DB.
+Run the full knowledge ingestion pipeline: parse (docling) → chunk →
+normalize (with LLM) → embed → store in Actian VectorAI DB.
 
 Requires:
 - .env with OPENAI_API_KEY
@@ -8,8 +8,8 @@ Requires:
 
 Usage::
 
-    python -m app.code_ingestion /path/to/repo
-    py -m app.code_ingestion ../sample/code
+    python -m app.knowledge_ingestion /path/to/docs
+    py -m app.knowledge_ingestion ../sample/knowledge
 """
 from __future__ import annotations
 
@@ -18,17 +18,17 @@ import sys
 from dotenv import load_dotenv
 
 import models
-from jobs.ingest_code import CodeIngestionJob
+from jobs.ingest_knowledge import KnowledgeIngestionJob
 from storage.vector_store import VectorStore
 
 
-def run(repo_path: str) -> None:
+def run(directory_path: str) -> None:
     load_dotenv()
     models.init()
 
     with VectorStore() as store:
-        job = CodeIngestionJob(vector_store=store, on_progress=print, should_use_llm=True)
-        result = job.run(repo_path)
+        job = KnowledgeIngestionJob(vector_store=store, on_progress=print, should_use_llm=True)
+        result = job.run(directory_path)
 
     print(f"\nFiles processed:    {result.files_processed}")
     print(f"Chunks parsed:      {result.chunks_parsed}")
