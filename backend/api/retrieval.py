@@ -27,6 +27,7 @@ from api.schemas import (
     make_source_ref,
     truncate_for_preview,
 )
+from api.settings import CODE_UPLOADS_DIR, KNOWLEDGE_UPLOADS_DIR
 from ingestion.code.python_parser import PythonParser
 from normalization.code.normalizer import CodeNormalizer
 from retrieval.pipelines import (
@@ -64,6 +65,18 @@ def _derive_title(result: RetrievalResult) -> str:
     return getattr(raw, "section_heading", None) or Path(result.source_file).name
 
 
+def _to_relative_source_file(result: RetrievalResult) -> str:
+    """Return the chunk's source_file as a POSIX path relative to its
+    uploads root so frontend links match the corpora API's tree paths."""
+    absolute = Path(result.source_file)
+    root = CODE_UPLOADS_DIR if result.chunk_type == "code" else KNOWLEDGE_UPLOADS_DIR
+    try:
+        relative = absolute.resolve().relative_to(root.resolve())
+    except (ValueError, OSError):
+        return absolute.name
+    return relative.as_posix()
+
+
 def _build_response(
     results: list[RetrievalResult],
     *,
@@ -77,7 +90,7 @@ def _build_response(
         make_source_ref(
             index=i,
             chunk_type=result.chunk_type,
-            source_file=result.source_file,
+            source_file=_to_relative_source_file(result),
             title=_derive_title(result),
             excerpt=truncate_for_preview(result.embed_text),
             score=result.score,

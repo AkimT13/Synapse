@@ -2,7 +2,8 @@
 
 import "highlight.js/styles/github-dark.css";
 
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { DocTreePane } from "@/components/knowledge/DocTreePane";
 import { DocViewerPane } from "@/components/knowledge/DocViewerPane";
@@ -34,6 +35,14 @@ function firstFile(node: TreeNode | null): string | null {
 }
 
 export default function KnowledgePage() {
+  return (
+    <Suspense fallback={<div className="empty">Loading documents…</div>}>
+      <KnowledgePageInner />
+    </Suspense>
+  );
+}
+
+function KnowledgePageInner() {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [treeError, setTreeError] = useState<string | null>(null);
 
@@ -43,13 +52,16 @@ export default function KnowledgePage() {
   const [docError, setDocError] = useState<string | null>(null);
 
   const { selection, setSelection } = useKnowledgeSelection();
+  const searchParams = useSearchParams();
+  const requestedFile = searchParams.get("file");
 
   const [retrievalResp, setRetrievalResp] =
     useState<RetrievalResponse | null>(null);
   const [retrievalLoading, setRetrievalLoading] = useState(false);
   const [retrievalError, setRetrievalError] = useState<string | null>(null);
 
-  // Load knowledge tree once on mount.
+  // Load knowledge tree once on mount. Deep-links (?file=…) win over the
+  // first-file fallback so citations can jump to a specific document.
   useEffect(() => {
     let cancelled = false;
     corpora
@@ -57,8 +69,7 @@ export default function KnowledgePage() {
       .then((t) => {
         if (cancelled) return;
         setTree(t);
-        // Auto-select the first file if nothing is active yet.
-        setActivePath((current) => current ?? firstFile(t));
+        setActivePath((current) => current ?? requestedFile ?? firstFile(t));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -69,7 +80,15 @@ export default function KnowledgePage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [requestedFile]);
+
+  // If the user navigates to a different ?file= while already on the page,
+  // swap the viewer to that doc.
+  useEffect(() => {
+    if (requestedFile && requestedFile !== activePath) {
+      setActivePath(requestedFile);
+    }
+  }, [requestedFile, activePath]);
 
   // Fetch the active document's contents whenever `activePath` changes.
   useEffect(() => {
@@ -161,6 +180,7 @@ export default function KnowledgePage() {
         loading={docLoading}
         error={treeError ?? docError}
         onSelectPassage={onSelectPassage}
+        retrievalLoading={retrievalLoading}
       />
 
       <RelatedCodePane

@@ -1,9 +1,10 @@
 "use client";
 
-import { Highlight, type Token, themes } from "prism-react-renderer";
 import { File as FileIcon, Copy, MoreHorizontal, List } from "lucide-react";
-import { useMemo, useEffect, useCallback } from "react";
+import { Highlight, type Token, themes } from "prism-react-renderer";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { HeaderAction } from "@/components/workspace/HeaderAction";
 import { cn } from "@/lib/cn";
 import type { CodeSelection } from "@/lib/stores";
 
@@ -71,13 +72,25 @@ function breadcrumbSegments(path: string | null): { parts: string[]; leaf: strin
   return { parts: pieces, leaf };
 }
 
-// Try to extract a function / class name near the start of the selected text.
+// Extract a function / class / def name near the start of the selection so
+// the header action can show it as a concrete target.
 function detectAnchor(text: string): string | null {
-  const m =
+  const match =
     text.match(/\bdef\s+([A-Za-z_][A-Za-z0-9_]*)/) ??
     text.match(/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)/) ??
     text.match(/\bfunction\s+([A-Za-z_][A-Za-z0-9_]*)/);
-  return m ? m[1] : null;
+  return match ? match[1] : null;
+}
+
+// Walk from an event's target up to the nearest .code-row and extract
+// its data-line attribute. Returns null if the event didn't land on a
+// known row (whitespace, sidebar, etc).
+function lineFromEvent(event: MouseEvent | React.MouseEvent): number | null {
+  const target = event.target as Element | null;
+  const row = target?.closest?.<HTMLElement>(".code-row[data-line]");
+  if (!row) return null;
+  const parsed = parseInt(row.dataset.line ?? "", 10);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 export function CodeViewerPane({
@@ -93,57 +106,108 @@ export function CodeViewerPane({
   const language = languageFromPath(filePath);
   const { parts, leaf } = breadcrumbSegments(filePath);
 
+  // Drag state lives in a ref because only mouseup commits a re-render
+  // via setSelection; tracking drag in state would churn needlessly.
+  const anchorRef = useRef<number | null>(null);
+  const [dragging, setDragging] = useState(false);
+
   const computeRange = useCallback(
     (start: number, end: number): CodeSelection | null => {
       if (!filePath) return null;
-      const a = Math.min(start, end);
-      const b = Math.max(start, end);
-      const slice = lines.slice(a - 1, b).join("\n");
+      const low = Math.min(start, end);
+      const high = Math.max(start, end);
+      const slice = lines.slice(low - 1, high).join("\n");
       return {
         file: filePath,
         text: slice,
-        startLine: a,
-        endLine: b,
+        startLine: low,
+        endLine: high,
       };
     },
     [filePath, lines],
   );
 
-  const onRowClick = useCallback(
-    (lineNumber: number, event: React.MouseEvent) => {
-      if (event.ctrlKey || event.metaKey) {
-        // clear
-        setSelection(null);
-        return;
-      }
-      if (event.shiftKey && selection && filePath) {
-        const range = computeRange(selection.startLine, lineNumber);
+  // Click / drag selection. Shift-click extends from the existing start,
+  // otherwise a fresh drag pins the anchor on mousedown and the head
+  // tracks the row under the cursor until mouseup.
+  const onRowMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      if (event.button !== 0) return;
+      const line = lineFromEvent(event);
+      if (line === null || !filePath) return;
+      event.preventDefault();
+
+      if (event.shiftKey && selection) {
+        const range = computeRange(selection.startLine, line);
         if (range) setSelection(range);
         return;
       }
-      // click = set a single-line selection & anchor for future shift-click
-      const range = computeRange(lineNumber, lineNumber);
+
+      anchorRef.current = line;
+      setDragging(true);
+      const range = computeRange(line, line);
       if (range) setSelection(range);
     },
     [computeRange, filePath, selection, setSelection],
   );
 
-  // Keyboard shortcut: Cmd/Ctrl+Enter while a selection exists.
+  // Window-level move/up so leaving the surface mid-drag doesn't strand
+  // the state — the user can drag into the sidebar and back, release
+  // anywhere, and the selection always resolves cleanly.
   useEffect(() => {
-    if (!selection) return;
-    const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-        e.preventDefault();
-        onFindRelated();
+    if (!dragging) return;
+
+    const onMove = (event: MouseEvent) => {
+      const anchor = anchorRef.current;
+      if (anchor === null) return;
+      const line = lineFromEvent(event);
+      if (line === null) return;
+      const range = computeRange(anchor, line);
+      if (range) setSelection(range);
+    };
+
+    const onUp = () => {
+      setDragging(false);
+      anchorRef.current = null;
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [dragging, computeRange, setSelection]);
+
+  // Keyboard: ⌘↵ fires retrieval, Escape clears the selection.
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        if (selection && !retrievalLoading) {
+          event.preventDefault();
+          onFindRelated();
+        }
+        return;
+      }
+      if (event.key === "Escape" && selection) {
+        event.preventDefault();
+        setSelection(null);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [selection, onFindRelated]);
+  }, [onFindRelated, retrievalLoading, selection, setSelection]);
 
-  const selectedBytes = selection ? new TextEncoder().encode(selection.text).length : 0;
-  const selectedLines = selection ? selection.endLine - selection.startLine + 1 : 0;
+  const selectedBytes = selection
+    ? new TextEncoder().encode(selection.text).length
+    : 0;
+  const selectedLines = selection
+    ? selection.endLine - selection.startLine + 1
+    : 0;
   const anchorName = selection ? detectAnchor(selection.text) : null;
+  const headerTarget =
+    anchorName ??
+    (selection ? `LN ${selection.startLine}–${selection.endLine}` : null);
 
   if (loading && !source) {
     return (
@@ -170,7 +234,14 @@ export function CodeViewerPane({
   return (
     <section className="pane code-stage">
       <div className="pane-head">
-        <div style={{ display: "flex", alignItems: "center", gap: 12, minWidth: 0 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            minWidth: 0,
+          }}
+        >
           <div className="code-tab">
             <FileIcon size={12} />
             <span className="truncate">{leaf}</span>
@@ -185,7 +256,14 @@ export function CodeViewerPane({
             <span className="leaf truncate">{leaf}</span>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <HeaderAction
+            label="Find related knowledge"
+            target={headerTarget}
+            onActivate={onFindRelated}
+            disabled={!selection}
+            busy={retrievalLoading}
+          />
           <span className="badge v">{language.toUpperCase()}</span>
           <button className="tool" aria-label="Symbols" type="button">
             <List size={14} />
@@ -208,36 +286,11 @@ export function CodeViewerPane({
         </div>
       </div>
 
-      <div className="code-surface" id="codeSurface" style={{ position: "relative" }}>
-        {selection && filePath === selection.file ? (
-          <button
-            type="button"
-            className="sel-action"
-            style={{
-              top: Math.max(12, (selection.startLine - 1) * 21 - 44),
-              left: 72,
-            }}
-            onClick={onFindRelated}
-            disabled={retrievalLoading}
-          >
-            <span className="arrow">↳</span>
-            {retrievalLoading ? (
-              <span>Searching…</span>
-            ) : (
-              <>
-                Find related knowledge
-                {anchorName ? (
-                  <>
-                    {" for "}
-                    <span className="kbd">{anchorName}</span>
-                  </>
-                ) : null}
-              </>
-            )}
-            <span className="kbd">⌘ ↵</span>
-          </button>
-        ) : null}
-
+      <div
+        className="code-surface"
+        id="codeSurface"
+        onMouseDown={onRowMouseDown}
+      >
         <Highlight code={source} language={language} theme={themes.nightOwl}>
           {({ tokens }) => (
             <>
@@ -251,23 +304,20 @@ export function CodeViewerPane({
                   <div
                     key={i}
                     className={cn("code-row", isSelected && "selected")}
-                    onClick={(e) => onRowClick(lineNumber, e)}
-                    style={{ cursor: "pointer" }}
+                    data-line={lineNumber}
                   >
                     <span className="ln">{lineNumber}</span>
                     <span className="cn">
-                      {line.length === 0 ? (
-                        "\u00a0"
-                      ) : (
-                        line.map((token, key) => {
-                          const cls = tokenClass(token.types);
-                          return (
-                            <span key={key} className={cls}>
-                              {token.content}
-                            </span>
-                          );
-                        })
-                      )}
+                      {line.length === 0
+                        ? "\u00a0"
+                        : line.map((token, key) => {
+                            const cls = tokenClass(token.types);
+                            return (
+                              <span key={key} className={cls}>
+                                {token.content}
+                              </span>
+                            );
+                          })}
                     </span>
                   </div>
                 );
@@ -285,7 +335,8 @@ export function CodeViewerPane({
             </span>
             <span style={{ color: "#404040" }}>·</span>
             <span>
-              SEL {selectedLines} {selectedLines === 1 ? "line" : "lines"}, {selectedBytes} bytes
+              SEL {selectedLines} {selectedLines === 1 ? "line" : "lines"},{" "}
+              {selectedBytes} bytes
             </span>
             <span style={{ color: "#404040" }}>·</span>
             <span>FILE</span>

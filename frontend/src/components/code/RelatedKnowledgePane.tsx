@@ -1,7 +1,9 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { useRef } from "react";
 
+import { CitedText } from "@/components/workspace/CitedText";
 import { ResultCard } from "@/components/workspace/ResultCard";
 import type { RetrievalResponse } from "@/lib/api";
 import type { CodeSelection } from "@/lib/stores";
@@ -14,10 +16,6 @@ interface RelatedKnowledgePaneProps {
   selectionLabel: string | null;
 }
 
-function encodePath(path: string): string {
-  return path.split("/").map(encodeURIComponent).join("/");
-}
-
 export function RelatedKnowledgePane({
   selection,
   response,
@@ -25,6 +23,7 @@ export function RelatedKnowledgePane({
   onRefresh,
   selectionLabel,
 }: RelatedKnowledgePaneProps) {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   return (
     <section className="pane">
       <div className="pane-head">
@@ -49,7 +48,7 @@ export function RelatedKnowledgePane({
         </button>
       </div>
 
-      <div className="pane-body">
+      <div className="pane-body" ref={bodyRef}>
         {loading ? (
           <div className="empty">
             <span className="animate-pulse">Searching…</span>
@@ -91,7 +90,7 @@ export function RelatedKnowledgePane({
                   lineHeight: 1.55,
                 }}
               >
-                {response.explanation}
+                <CitedText text={response.explanation} containerRef={bodyRef} />
               </div>
             ) : null}
 
@@ -99,7 +98,8 @@ export function RelatedKnowledgePane({
               <ResultCard
                 key={`${result.chunk_type}-${result.source_file}-${result.index}`}
                 result={result}
-                href={`/knowledge/${encodePath(result.source_file)}`}
+                citationIndex={result.index}
+                href={`/knowledge?file=${encodeURIComponent(result.source_file)}`}
               />
             ))}
           </div>

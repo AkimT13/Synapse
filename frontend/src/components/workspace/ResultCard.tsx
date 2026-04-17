@@ -9,9 +9,12 @@ interface ResultCardProps {
   result: SourceRef;
   // Where clicking the card navigates. If omitted the card is static.
   href?: string;
+  // When set, the card exposes `data-citation-index={n}` so citation
+  // badges in the companion explanation can scroll to and flash it.
+  citationIndex?: number;
 }
 
-export function ResultCard({ result, href }: ResultCardProps) {
+export function ResultCard({ result, href, citationIndex }: ResultCardProps) {
   const content = (
     <>
       <div className="result-meta">
@@ -24,10 +27,18 @@ export function ResultCard({ result, href }: ResultCardProps) {
   );
 
   if (!href) {
-    return <div className="result-card">{content}</div>;
+    return (
+      <div className="result-card" data-citation-index={citationIndex}>
+        {content}
+      </div>
+    );
   }
   return (
-    <Link href={href} className="result-card block">
+    <Link
+      href={href}
+      className="result-card block"
+      data-citation-index={citationIndex}
+    >
       {content}
     </Link>
   );

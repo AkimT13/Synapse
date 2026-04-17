@@ -28,6 +28,7 @@ from api.schemas import (
     make_source_ref,
     truncate_for_preview,
 )
+from api.settings import CODE_UPLOADS_DIR, KNOWLEDGE_UPLOADS_DIR
 from retrieval.pipelines import answer_question
 from retrieval.schemas import RetrievalResult
 from storage.vector_store import VectorStore
@@ -53,12 +54,22 @@ def _derive_conversation_title(content: str) -> str:
     return cleaned[:_TITLE_MAX_CHARS].rstrip() + "..."
 
 
+def _to_relative_source_file(result: RetrievalResult) -> str:
+    absolute = Path(result.source_file)
+    root = CODE_UPLOADS_DIR if result.chunk_type == "code" else KNOWLEDGE_UPLOADS_DIR
+    try:
+        relative = absolute.resolve().relative_to(root.resolve())
+    except (ValueError, OSError):
+        return absolute.name
+    return relative.as_posix()
+
+
 def _results_to_sources(results: list[RetrievalResult]) -> list[SourceRef]:
     return [
         make_source_ref(
             index=i,
             chunk_type=result.chunk_type,
-            source_file=result.source_file,
+            source_file=_to_relative_source_file(result),
             title=_derive_title(result),
             excerpt=truncate_for_preview(result.embed_text),
             score=result.score,

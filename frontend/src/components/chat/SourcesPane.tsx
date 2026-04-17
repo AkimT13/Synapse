@@ -16,16 +16,11 @@ export interface SourcesPaneHandle {
   flash: (index: number) => void;
 }
 
-// Build a path the card links to. Code paths go under /code/<source_file>,
-// knowledge under /knowledge/<source_file>. The workspace pages can
-// later read the path from the URL.
+// Code paths go to /code?file=<path>, knowledge to /knowledge?file=<path>.
+// The workspace pages read the `file` param and open that file.
 function hrefFor(source: SourceRef): string {
   const prefix = source.chunk_type === "code" ? "/code" : "/knowledge";
-  const encoded = source.source_file
-    .split("/")
-    .map(encodeURIComponent)
-    .join("/");
-  return `${prefix}/${encoded}`;
+  return `${prefix}?file=${encodeURIComponent(source.source_file)}`;
 }
 
 export const SourcesPane = forwardRef<SourcesPaneHandle, SourcesPaneProps>(

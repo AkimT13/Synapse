@@ -37,11 +37,17 @@ interface UploadCardProps {
   statLabels: [string, string, string];
 }
 
-// Map the accumulated SSE messages + ack to the three stat values.
-function deriveStats(state: JobState): [number, number, number] {
+// Map the accumulated SSE messages + ack to the three stat values. For
+// an already-uploaded corpus we only know the file count on disk —
+// chunk counts aren't cheap to compute without re-ingesting — so the
+// non-file slots surface as `null` and render as em-dashes.
+function deriveStats(state: JobState): [number | null, number | null, number | null] {
   if (state.kind === "done") {
     const r = state.result;
     return [r.files_processed, r.chunks_parsed, r.chunks_stored];
+  }
+  if (state.kind === "already-uploaded") {
+    return [state.fileCount, null, null];
   }
   return [0, 0, 0];
 }
@@ -109,7 +115,7 @@ export function UploadCard({
       : "radial-gradient(ellipse 340px 160px at 50% -10%, rgba(6,182,212,0.22), transparent 70%)";
 
   const isBusy = state.kind === "uploading" || state.kind === "running";
-  const isDone = state.kind === "done";
+  const isDone = state.kind === "done" || state.kind === "already-uploaded";
 
   return (
     <section
@@ -298,14 +304,28 @@ export function UploadCard({
                 <Check size={20} strokeWidth={1.8} />
               </div>
               <div className="text-sm font-medium text-white">
-                {idleTitle.replace(/^[a-z]/, (c) => c.toUpperCase())} ingested
+                {state.kind === "already-uploaded"
+                  ? `${idleTitle.replace(/^[a-z]/, (c) => c.toUpperCase())} already uploaded`
+                  : `${idleTitle.replace(/^[a-z]/, (c) => c.toUpperCase())} ingested`}
               </div>
               <div className="mt-1 text-xs text-[#737373]">
-                {(state.kind === "done" ? state.result.files_processed : 0)} files
-                processed · {(state.kind === "done" ? state.result.chunks_stored : 0)} chunks stored
-                {state.kind === "done" && state.result.errors.length > 0
-                  ? ` · ${state.result.errors.length} errors`
-                  : ""}
+                {state.kind === "done"
+                  ? `${state.result.files_processed} files processed · ${state.result.chunks_stored} chunks stored${
+                      state.result.errors.length > 0
+                        ? ` · ${state.result.errors.length} errors`
+                        : ""
+                    }`
+                  : state.kind === "already-uploaded"
+                    ? `${state.fileCount} files already on disk · ready to query`
+                    : ""}
+              </div>
+              <div className="mt-4">
+                <label
+                  htmlFor={inputId}
+                  className="btn btn-ghost cursor-pointer"
+                >
+                  Replace
+                </label>
               </div>
             </>
           ) : null}
@@ -342,10 +362,10 @@ export function UploadCard({
                 {label}
               </div>
               <div className="mt-1 font-mono text-base text-white">
-                {isBusy ? (
+                {isBusy || stats[i] === null ? (
                   <span className="text-[#525252]">—</span>
                 ) : (
-                  stats[i].toLocaleString()
+                  stats[i]!.toLocaleString()
                 )}
               </div>
             </div>

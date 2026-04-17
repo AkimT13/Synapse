@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -21,7 +22,7 @@ function extensionOf(path: string): string {
   return path.slice(idx + 1).toLowerCase();
 }
 
-export function DocumentRenderer({ path, content }: DocumentRendererProps) {
+function DocumentRendererImpl({ path, content }: DocumentRendererProps) {
   const ext = extensionOf(path);
 
   if (ext === "md" || ext === "markdown") {
@@ -156,3 +157,10 @@ export function DocumentRenderer({ path, content }: DocumentRendererProps) {
     </div>
   );
 }
+
+// Memoized so that parent state changes (e.g. selection capture) don't force
+// a re-render of the ReactMarkdown tree — re-rendering would produce new
+// component references for custom renderers (h1, p, code, …), causing
+// ReactMarkdown to unmount/remount the rendered DOM and destroy any active
+// text selection mid-drag.
+export const DocumentRenderer = memo(DocumentRendererImpl);

@@ -7,6 +7,7 @@ import {
   ingestCode,
   ingestJobStreamUrl,
   ingestKnowledge,
+  workspace,
 } from "@/lib/api";
 import { UploadCard } from "@/components/onboarding/UploadCard";
 import type { IngestionDoneResult, JobState } from "@/components/onboarding/types";
@@ -34,6 +35,41 @@ export default function OnboardingPage() {
     return () => {
       codeRef.current?.close();
       knowledgeRef.current?.close();
+    };
+  }, []);
+
+  // On mount, detect whether a previous session already uploaded corpora.
+  // If so, seed each side's state to "already-uploaded" so the card shows
+  // a done look with a replace affordance rather than an empty dropzone.
+  useEffect(() => {
+    let cancelled = false;
+    workspace
+      .stats()
+      .then((stats) => {
+        if (cancelled) return;
+        if (stats.code_files > 0) {
+          setCodeState((current) =>
+            current.kind === "idle"
+              ? { kind: "already-uploaded", fileCount: stats.code_files }
+              : current,
+          );
+        }
+        if (stats.knowledge_files > 0) {
+          setKnowledgeState((current) =>
+            current.kind === "idle"
+              ? {
+                  kind: "already-uploaded",
+                  fileCount: stats.knowledge_files,
+                }
+              : current,
+          );
+        }
+      })
+      .catch(() => {
+        // Backend may be down; leave both sides in idle.
+      });
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -143,8 +179,15 @@ export default function OnboardingPage() {
     [openStream],
   );
 
-  const bothDone =
-    codeState.kind === "done" && knowledgeState.kind === "done";
+  // A side counts as "ready" when freshly ingested OR when the backend
+  // already had a corpus on disk at page load. Either way the user has
+  // something to open.
+  const codeReady =
+    codeState.kind === "done" || codeState.kind === "already-uploaded";
+  const knowledgeReady =
+    knowledgeState.kind === "done" ||
+    knowledgeState.kind === "already-uploaded";
+  const bothDone = codeReady && knowledgeReady;
 
   const totalChunks = useMemo(() => {
     const c = codeState.kind === "done" ? codeState.result.chunks_stored : 0;

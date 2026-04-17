@@ -24,13 +24,10 @@ export function DocTreePane({
         <span className="pane-title">Documents</span>
         <span className="pane-sub">{count}</span>
       </div>
-      <div className="search-box flex items-center gap-2 mx-3 my-2.5 px-2.5 py-2 border border-white/5 bg-black/30 rounded-lg text-white/40 text-xs">
+      <label className="search-box">
         <Search size={12} />
-        <input
-          placeholder="Find in docs"
-          className="flex-1 bg-transparent border-0 outline-none text-white/90 text-xs placeholder:text-white/30"
-        />
-      </div>
+        <input placeholder="Find in docs" />
+      </label>
       <div className="pane-body">
         {tree && tree.children && tree.children.length > 0 ? (
           <FileTree

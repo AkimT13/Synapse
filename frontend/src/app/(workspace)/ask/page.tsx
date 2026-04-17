@@ -233,11 +233,22 @@ export default function AskPage() {
   ]);
 
   // --- derived: sources for the focused assistant turn --------------------
+  // Only surface the sources the assistant actually cited in its prose.
+  // The LLM is prompted to emit [N] markers where N indexes the retrieved
+  // results; anything retrieved but not referenced stays hidden so the
+  // panel count matches the badges in the text.
   const focusedSources = useMemo(() => {
     const focused = messages.find(
       (m) => m.role === "assistant" && m.id === focusedAssistantId,
     );
-    return focused?.sources ?? [];
+    if (!focused) return [];
+    const citedIndices = new Set(
+      Array.from(focused.content.matchAll(/\[(\d+)\]/g)).map((match) =>
+        parseInt(match[1], 10),
+      ),
+    );
+    if (citedIndices.size === 0) return [];
+    return focused.sources.filter((source) => citedIndices.has(source.index));
   }, [messages, focusedAssistantId]);
 
   // --- handlers ------------------------------------------------------------

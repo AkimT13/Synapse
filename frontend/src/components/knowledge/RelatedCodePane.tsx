@@ -1,7 +1,9 @@
 "use client";
 
 import { RefreshCw } from "lucide-react";
+import { useRef } from "react";
 
+import { CitedText } from "@/components/workspace/CitedText";
 import { ResultCard } from "@/components/workspace/ResultCard";
 import type { RetrievalResponse } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -26,6 +28,7 @@ export function RelatedCodePane({
   response,
   onRefresh,
 }: RelatedCodePaneProps) {
+  const bodyRef = useRef<HTMLDivElement | null>(null);
   return (
     <section className="pane">
       <div className="pane-head">
@@ -52,7 +55,7 @@ export function RelatedCodePane({
         </button>
       </div>
 
-      <div className="pane-body">
+      <div className="pane-body" ref={bodyRef}>
         {!selectionText ? (
           <div className="empty">
             Select a passage to find code that implements it
@@ -81,9 +84,12 @@ export function RelatedCodePane({
                     </div>
                   )}
                 {response.explanation && (
-                  <p className="text-[13px] leading-relaxed text-white/75">
-                    {response.explanation}
-                  </p>
+                  <div className="text-[13px] leading-relaxed text-white/75">
+                    <CitedText
+                      text={response.explanation}
+                      containerRef={bodyRef}
+                    />
+                  </div>
                 )}
               </div>
             )}
@@ -95,7 +101,8 @@ export function RelatedCodePane({
                 <ResultCard
                   key={`${ref.source_file}-${ref.index}-${idx}`}
                   result={ref}
-                  href={`/code/${ref.source_file}`}
+                  citationIndex={ref.index}
+                  href={`/code?file=${encodeURIComponent(ref.source_file)}`}
                 />
               ))
             )}

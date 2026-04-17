@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { CodeViewerPane } from "@/components/code/CodeViewerPane";
 import { FileTreePane } from "@/components/code/FileTreePane";
@@ -30,22 +31,38 @@ function detectAnchor(text: string): string | null {
 }
 
 export default function CodePage() {
+  return (
+    <Suspense fallback={<div className="empty">Loading workspace…</div>}>
+      <CodePageInner />
+    </Suspense>
+  );
+}
+
+function CodePageInner() {
   const { selection, setSelection } = useCodeSelection();
   const [activePath, setActivePath] = useState<string | null>(null);
   const [response, setResponse] = useState<RetrievalResponse | null>(null);
+  const searchParams = useSearchParams();
+  const requestedFile = searchParams.get("file");
 
   const treeQuery = useQuery({
     queryKey: ["code-tree"],
     queryFn: () => corpora.codeTree(),
   });
 
-  // Default to the first file in the tree once it loads.
+  // Pick the active file: url ?file= param wins over the first-file fallback,
+  // so citations can deep-link into a specific source file.
   useEffect(() => {
-    if (treeQuery.data && !activePath) {
+    if (requestedFile && requestedFile !== activePath) {
+      setActivePath(requestedFile);
+      setResponse(null);
+      return;
+    }
+    if (!requestedFile && treeQuery.data && !activePath) {
       const initial = firstFile(treeQuery.data);
       if (initial) setActivePath(initial);
     }
-  }, [treeQuery.data, activePath]);
+  }, [requestedFile, treeQuery.data, activePath]);
 
   const fileQuery = useQuery({
     queryKey: ["code-file", activePath],
