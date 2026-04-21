@@ -34,11 +34,130 @@ except ImportError as exc:  # pragma: no cover - exercised in dev envs
     VectorParams = None  # type: ignore[assignment]
     _ACTIAN_IMPORT_ERROR = exc
 
+if _ACTIAN_IMPORT_ERROR is None:
+    import grpc.aio
+    from actian_vectorai._executor import BackgroundLoop
+    from actian_vectorai._collections import CollectionsNamespace
+    from actian_vectorai._points import PointsNamespace
+    from actian_vectorai._vde import VDENamespace
+    from actian_vectorai.client import VectorAIClient as BaseVectorAIClient
+    from actian_vectorai.async_client import AsyncVectorAIClient as BaseAsyncVectorAIClient
+    from actian_vectorai.async_client import (
+        col_grpc,
+        ext_grpc,
+        pts_grpc,
+        vectorai_grpc,
+    )
+    from actian_vectorai.exceptions import ConnectionError as VaiConnectionError
+    from actian_vectorai.exceptions import ErrorCode
+    from actian_vectorai.transport import (
+        AuthInterceptor,
+        LoggingInterceptor,
+        MetadataInterceptor,
+        RetryInterceptor,
+        TracingInterceptor,
+        UserAgentInterceptor,
+        create_credentials_from_files,
+    )
+else:  # pragma: no cover - import-free fallback for dev envs
+    BaseVectorAIClient = None  # type: ignore[assignment]
+    BaseAsyncVectorAIClient = None  # type: ignore[assignment]
+
 from embeddings.schemas import EmbeddedChunk
 
 """Keep batches under the beta DB's ~64KB-per-point payload limit."""
 BATCHER_SIZE_LIMIT = 5
 BATCHER_BYTE_LIMIT = 512 * 1024
+DEFAULT_GRPC_OPTIONS = [
+    ("grpc.keepalive_time_ms", 120_000),
+    ("grpc.keepalive_timeout_ms", 20_000),
+    ("grpc.keepalive_permit_without_calls", 0),
+    ("grpc.http2.max_pings_without_data", 1),
+]
+
+
+if _ACTIAN_IMPORT_ERROR is None:
+    class ConservativeAsyncVectorAIClient(BaseAsyncVectorAIClient):
+        """Actian client wrapper with safer gRPC keepalive settings."""
+
+        async def connect(self) -> None:  # noqa: C901
+            if self._connected:
+                return
+
+            cfg = self._config
+
+            interceptors: list[grpc.aio.UnaryUnaryClientInterceptor] = []
+            if cfg.api_key:
+                interceptors.append(AuthInterceptor(api_key=cfg.api_key))
+            if cfg.max_retries > 0:
+                interceptors.append(RetryInterceptor(max_retries=cfg.max_retries))
+            if cfg.enable_tracing:
+                interceptors.append(TracingInterceptor())
+            if cfg.enable_logging:
+                interceptors.append(LoggingInterceptor())
+            if cfg.metadata:
+                interceptors.append(
+                    MetadataInterceptor(metadata=list(cfg.metadata.items()))
+                )
+            interceptors.append(UserAgentInterceptor())
+
+            options: list[tuple[str, object]] = [
+                ("grpc.max_receive_message_length", cfg.max_message_size),
+                ("grpc.max_send_message_length", cfg.max_message_size),
+                *cfg.grpc_options,
+            ]
+            if cfg.tls:
+                credentials = create_credentials_from_files(
+                    ca_cert_path=cfg.tls_ca_cert,
+                    client_key_path=cfg.tls_client_key,
+                    client_cert_path=cfg.tls_client_cert,
+                )
+                self._channel = grpc.aio.secure_channel(
+                    cfg.url,
+                    credentials,
+                    options=options,
+                    interceptors=interceptors or None,
+                )
+            else:
+                self._channel = grpc.aio.insecure_channel(
+                    cfg.url,
+                    options=options,
+                    interceptors=interceptors or None,
+                )
+            channel = self._channel
+
+            self._collections = CollectionsNamespace(
+                col_grpc.CollectionsStub(channel),
+                timeout=cfg.timeout,
+            )
+            self._points = PointsNamespace(
+                pts_grpc.PointsStub(channel),
+                timeout=cfg.timeout,
+            )
+            self._vde = VDENamespace(
+                ext_grpc.CollectionsExtStub(channel),
+                timeout=cfg.timeout,
+            )
+            self._vectorai_stub = vectorai_grpc.ActianVectorAIStub(channel)
+            self._connected = True
+
+            try:
+                await self.health_check(timeout=min(cfg.timeout or 5.0, 5.0))
+            except Exception as e:
+                await self.close()
+                raise VaiConnectionError(
+                    f"Server at '{cfg.url}' is not reachable",
+                    code=ErrorCode.SERVICE_UNAVAILABLE,
+                ) from e
+
+
+    class ConservativeVectorAIClient(BaseVectorAIClient):
+        def __init__(self, url: str = "localhost:50051", **kwargs) -> None:
+            self._loop = BackgroundLoop()
+            self._async_client = ConservativeAsyncVectorAIClient(url, **kwargs)
+            self._collections = None
+            self._points = None
+            self._vde = None
 
 
 @dataclass(frozen=True)
@@ -124,16 +243,21 @@ class VectorStore:
         host: str = "localhost:50051",
         collection: str = "chunks",
         distance=None,
+        grpc_options: list[tuple[str, object]] | None = None,
     ):
         _require_actian()
         self._host = host
         self._collection = collection
         self._distance = distance if distance is not None else Distance.Cosine
+        self._grpc_options = grpc_options or list(DEFAULT_GRPC_OPTIONS)
         self._client: VectorAIClient | None = None
 
     def connect(self) -> None:
         _require_actian()
-        self._client = VectorAIClient(self._host)
+        self._client = ConservativeVectorAIClient(
+            self._host,
+            grpc_options=self._grpc_options,
+        )
         self._client.connect()
 
     def close(self) -> None:
@@ -182,7 +306,10 @@ class VectorStore:
         _require_actian()
         stored = 0
 
-        async with AsyncVectorAIClient(self._host) as async_client:
+        async with ConservativeAsyncVectorAIClient(
+            self._host,
+            grpc_options=self._grpc_options,
+        ) as async_client:
 
             async def flush(collection_name: str, items: list) -> None:
                 nonlocal stored

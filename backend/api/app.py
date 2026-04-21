@@ -15,6 +15,7 @@ Run with::
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
@@ -24,13 +25,19 @@ import models
 from api.chat_store import ChatStore
 from api.settings import CHAT_DB_PATH, CORS_ORIGINS, ensure_directories
 from storage.vector_store import VectorStore
+from workspace import init_models_from_workspace, load_workspace_config
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     load_dotenv()
     ensure_directories()
-    models.init()
+    try:
+        workspace = load_workspace_config(Path(__file__))
+    except FileNotFoundError:
+        models.init()
+    else:
+        init_models_from_workspace(workspace)
 
     store = VectorStore()
     store.connect()

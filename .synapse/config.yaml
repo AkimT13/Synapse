@@ -6,20 +6,12 @@ workspace:
 
 sources:
   code_roots:
-    - path: backend
+    - path: sample/code
       language_hints: [python]
       include:
         - "**/*.py"
       exclude:
         - "**/__pycache__/**"
-    - path: frontend
-      language_hints: [typescript]
-      include:
-        - "**/*.ts"
-        - "**/*.tsx"
-      exclude:
-        - "**/.next/**"
-        - "**/node_modules/**"
 
   knowledge_roots:
     - path: sample/knowledge
@@ -41,14 +33,12 @@ domains:
 
 models:
   chat:
-    provider: openai
-    model: gpt-4o-mini
-    api_key_env: OPENAI_API_KEY
+    provider: ollama
+    model: gemma4:e2b
 
   embeddings:
-    provider: openai
-    model: text-embedding-3-large
-    api_key_env: OPENAI_API_KEY
+    provider: ollama
+    model: nomic-embed-text
 
 runtime:
   ollama:

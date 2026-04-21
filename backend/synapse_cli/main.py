@@ -4,7 +4,10 @@ import argparse
 import sys
 from pathlib import Path
 
+from synapse_cli.drift_check_command import run_drift_check
+from synapse_cli.ingest_command import run_ingest
 from synapse_cli.init_command import InitOptions, prompt_for_init_options, run_init
+from synapse_cli.query_command import run_query
 from synapse_cli.status_command import run_status
 
 
@@ -79,6 +82,88 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON",
     )
 
+    ingest_parser = subparsers.add_parser(
+        "ingest",
+        help="Ingest configured code and/or knowledge roots into the vector store",
+    )
+    ingest_parser.add_argument(
+        "target",
+        nargs="?",
+        choices=["all", "code", "knowledge"],
+        default="all",
+        help="Which configured roots to ingest",
+    )
+    ingest_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    ingest_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    query_parser = subparsers.add_parser(
+        "query",
+        help="Run retrieval over the configured workspace",
+    )
+    query_parser.add_argument(
+        "mode",
+        choices=["free", "code", "knowledge"],
+        help="Which retrieval flow to use",
+    )
+    query_parser.add_argument(
+        "text",
+        help="Question or source text to query with",
+    )
+    query_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    query_parser.add_argument(
+        "--k",
+        type=int,
+        help="Override result count",
+    )
+    query_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    drift_parser = subparsers.add_parser(
+        "drift-check",
+        help="Check code against the indexed knowledge base for domain drift",
+    )
+    drift_input = drift_parser.add_mutually_exclusive_group(required=True)
+    drift_input.add_argument(
+        "text",
+        nargs="?",
+        help="Inline code text or behavior description to check",
+    )
+    drift_input.add_argument(
+        "--file",
+        help="Path to a Python file to check",
+    )
+    drift_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    drift_parser.add_argument(
+        "--k",
+        type=int,
+        default=5,
+        help="Number of supporting knowledge chunks to consider per check",
+    )
+    drift_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
     return parser
 
 
@@ -90,6 +175,12 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_init(args)
     if args.command == "status":
         return _handle_status(args)
+    if args.command == "ingest":
+        return _handle_ingest(args)
+    if args.command == "query":
+        return _handle_query(args)
+    if args.command == "drift-check":
+        return _handle_drift_check(args)
 
     parser.print_help()
     return 1
@@ -139,6 +230,51 @@ def _handle_status(args: argparse.Namespace) -> int:
     )
 
     stream = sys.stderr if exit_code != 0 else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_ingest(args: argparse.Namespace) -> int:
+    progress_sink = None
+    if not args.json:
+        progress_sink = lambda message: print(f"[progress] {message}", flush=True)
+
+    exit_code, output = run_ingest(
+        start_path=args.repo_root,
+        target=args.target,
+        as_json=args.json,
+        progress_sink=progress_sink,
+    )
+
+    stream = sys.stderr if exit_code == 2 else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_query(args: argparse.Namespace) -> int:
+    exit_code, output = run_query(
+        start_path=args.repo_root,
+        mode=args.mode,
+        text=args.text,
+        as_json=args.json,
+        k=args.k,
+    )
+
+    stream = sys.stderr if exit_code == 2 else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_drift_check(args: argparse.Namespace) -> int:
+    exit_code, output = run_drift_check(
+        start_path=args.repo_root,
+        text=args.text,
+        file_path=args.file,
+        as_json=args.json,
+        k=args.k,
+    )
+
+    stream = sys.stderr if exit_code in (1, 2) else sys.stdout
     print(output, file=stream)
     return exit_code
 
