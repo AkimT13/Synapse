@@ -11,6 +11,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -e .
+pip install -r requirements-actian.txt
 
 cp .env.example .env
 # Edit .env: set OPENAI_API_KEY, or switch providers to local Ollama.
@@ -19,6 +20,11 @@ cp .env.example .env
 docker-compose up -d       # Actian VectorAI DB on localhost:50051
 python -m app.main         # API on localhost:8000
 ```
+
+`pip install -e .` installs the backend, tests, and CLI without the
+bundled Actian wheel so editable installs work reliably on new machines.
+To run the API or anything that touches the VectorAI client, install the
+bundled wheel separately with `pip install -r requirements-actian.txt`.
 
 ## Smoke test (no UI)
 

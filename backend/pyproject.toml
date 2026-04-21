@@ -5,7 +5,7 @@ requires-python = ">=3.10"
 dependencies = [
     "pydantic==2.13.0",
     "pydantic-settings",
-    "actian-vectorai @ file:actian_vectorai-0.1.0b2-py3-none-any.whl",
+    "PyYAML>=6.0",
     "pytest==9.0.3",
     "docling",
     "tree-sitter==0.25.2",
@@ -19,6 +19,9 @@ dependencies = [
     "python-multipart==0.0.26",
 ]
 
+[project.scripts]
+synapse = "synapse_cli.main:main"
+
 [tool.setuptools]
 packages = [
     "api",
@@ -31,6 +34,8 @@ packages = [
     "storage",
     "models",
     "jobs",
+    "synapse_cli",
+    "workspace",
 ]
 
 [tool.pytest.ini_options]

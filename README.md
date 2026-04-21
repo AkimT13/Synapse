@@ -37,6 +37,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -e .
+pip install -r requirements-actian.txt
 
 cp .env.example .env
 # Edit .env and set OPENAI_API_KEY 
@@ -45,6 +46,11 @@ cp .env.example .env
 
 python -m api.app         
 ```
+
+`pip install -e .` now installs the general backend and CLI dependencies.
+The Actian Python client is installed separately from the bundled wheel via
+`requirements-actian.txt` so editable installs remain portable across
+machines.
 
 ### 3. Frontend (port 3000)
 

@@ -9,17 +9,30 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 
-from actian_vectorai import (
-    AsyncVectorAIClient,
-    BatcherConfig,
-    Distance,
-    Field,
-    FilterBuilder,
-    PointStruct,
-    SmartBatcher,
-    VectorAIClient,
-    VectorParams,
-)
+try:
+    from actian_vectorai import (
+        AsyncVectorAIClient,
+        BatcherConfig,
+        Distance,
+        Field,
+        FilterBuilder,
+        PointStruct,
+        SmartBatcher,
+        VectorAIClient,
+        VectorParams,
+    )
+    _ACTIAN_IMPORT_ERROR: ImportError | None = None
+except ImportError as exc:  # pragma: no cover - exercised in dev envs
+    AsyncVectorAIClient = None  # type: ignore[assignment]
+    BatcherConfig = None  # type: ignore[assignment]
+    Distance = None  # type: ignore[assignment]
+    Field = None  # type: ignore[assignment]
+    FilterBuilder = None  # type: ignore[assignment]
+    PointStruct = None  # type: ignore[assignment]
+    SmartBatcher = None  # type: ignore[assignment]
+    VectorAIClient = None  # type: ignore[assignment]
+    VectorParams = None  # type: ignore[assignment]
+    _ACTIAN_IMPORT_ERROR = exc
 
 from embeddings.schemas import EmbeddedChunk
 
@@ -45,12 +58,25 @@ def _reconstruct_chunk(raw: dict) -> EmbeddedChunk:
     return EmbeddedChunk(**raw, vector=[])
 
 
+def _require_actian() -> None:
+    if _ACTIAN_IMPORT_ERROR is not None:
+        raise RuntimeError(
+            "Actian VectorAI client is not installed. "
+            "Run `pip install -r requirements-actian.txt` from backend/."
+        ) from _ACTIAN_IMPORT_ERROR
+
+
+def actian_available() -> bool:
+    return _ACTIAN_IMPORT_ERROR is None
+
+
 async def _try_upsert_one(
     async_client: AsyncVectorAIClient,
     collection_name: str,
     item,
 ) -> bool:
     """Upsert a single point, swallowing errors. Returns True on success."""
+    _require_actian()
     try:
         await async_client.points.upsert(
             collection_name,
@@ -69,6 +95,7 @@ def _build_filter(filters: dict) -> object:
     Dict values are treated as range conditions:
         {"confidence": {"$gte": 0.8}}  →  Field("confidence").gte(0.8)
     """
+    _require_actian()
     builder = FilterBuilder()
 
     for field_name, value in filters.items():
@@ -96,14 +123,16 @@ class VectorStore:
         self,
         host: str = "localhost:50051",
         collection: str = "chunks",
-        distance: Distance = Distance.Cosine,
+        distance=None,
     ):
+        _require_actian()
         self._host = host
         self._collection = collection
-        self._distance = distance
+        self._distance = distance if distance is not None else Distance.Cosine
         self._client: VectorAIClient | None = None
 
     def connect(self) -> None:
+        _require_actian()
         self._client = VectorAIClient(self._host)
         self._client.connect()
 
@@ -128,6 +157,7 @@ class VectorStore:
         return self._client
 
     def ensure_collection(self, dimension: int) -> None:
+        _require_actian()
         if not self.client.collections.exists(self._collection):
             self.client.collections.create(
                 self._collection,
@@ -149,6 +179,7 @@ class VectorStore:
         bad. Chunks that still fail on their own are dropped silently;
         the caller sees the drop through the returned count.
         """
+        _require_actian()
         stored = 0
 
         async with AsyncVectorAIClient(self._host) as async_client:
@@ -214,6 +245,7 @@ class VectorStore:
                 {"chunk_type": "code", "language": "python"}
                 {"knowledge_type": "constraint", "confidence": {"$gte": 0.8}}
         """
+        _require_actian()
         actian_filter = _build_filter(filters) if filters else None
 
         results = self.client.points.search(
@@ -237,6 +269,7 @@ class VectorStore:
         Returns 0 if the collection does not exist yet, so callers can
         invoke this on a fresh workspace without pre-checking existence.
         """
+        _require_actian()
         if not self.client.collections.exists(self._collection):
             return 0
         actian_filter = _build_filter(filters) if filters else None

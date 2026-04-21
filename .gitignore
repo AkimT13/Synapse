@@ -6,6 +6,7 @@ CLAUDE.md
 AGENTS.md
 CODESTYLE.md
 memory/
+.synapse/.env
 .env.*
 backend/.env*
 .claude

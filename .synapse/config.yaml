@@ -1,0 +1,72 @@
+version: 1
+
+workspace:
+  name: synapse
+  root: .
+
+sources:
+  code_roots:
+    - path: backend
+      language_hints: [python]
+      include:
+        - "**/*.py"
+      exclude:
+        - "**/__pycache__/**"
+    - path: frontend
+      language_hints: [typescript]
+      include:
+        - "**/*.ts"
+        - "**/*.tsx"
+      exclude:
+        - "**/.next/**"
+        - "**/node_modules/**"
+
+  knowledge_roots:
+    - path: sample/knowledge
+      kinds: [scientific, reference, demo]
+      include:
+        - "**/*.md"
+
+filters:
+  global_exclude:
+    - "**/.git/**"
+    - "**/.venv/**"
+    - "**/*.egg-info/**"
+    - "**/build/**"
+    - "**/dist/**"
+
+domains:
+  - name: domain-aware-development
+    tags: [constraints, retrieval, agent-memory, tooling]
+
+models:
+  chat:
+    provider: openai
+    model: gpt-4o-mini
+    api_key_env: OPENAI_API_KEY
+
+  embeddings:
+    provider: openai
+    model: text-embedding-3-large
+    api_key_env: OPENAI_API_KEY
+
+runtime:
+  ollama:
+    base_url: http://localhost:11434
+    base_url_env: SYNAPSE_OLLAMA_BASE_URL
+
+ingestion:
+  auto_ingest_on_init: false
+  follow_symlinks: false
+  max_file_size_mb: 25
+
+watch:
+  enabled: true
+  debounce_ms: 1500
+
+retrieval:
+  default_top_k: 8
+
+drift_checks:
+  enabled: true
+  severity_threshold: medium
