@@ -6,6 +6,7 @@ from pathlib import Path
 
 from synapse_cli.drift_check_command import run_drift_check
 from synapse_cli.ingest_command import run_ingest
+from synapse_cli.install_skill_command import run_install_skill
 from synapse_cli.init_command import InitOptions, prompt_for_init_options, run_init
 from synapse_cli.query_command import run_query
 from synapse_cli.reindex_command import run_reindex
@@ -257,6 +258,32 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON",
     )
 
+    install_skill_parser = subparsers.add_parser(
+        "install-skill",
+        help="Install the Synapse review skill for Codex, Claude, or both",
+    )
+    install_skill_parser.add_argument(
+        "--agent",
+        choices=["codex", "claude", "both"],
+        default="both",
+        help="Which coding agent skill directories to install into",
+    )
+    install_skill_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose repository skill directories should be updated",
+    )
+    install_skill_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite an existing installed skill",
+    )
+    install_skill_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
     return parser
 
 
@@ -282,6 +309,8 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_reindex(args)
     if args.command == "review":
         return _handle_review(args)
+    if args.command == "install-skill":
+        return _handle_install_skill(args)
 
     parser.print_help()
     return 1
@@ -435,6 +464,19 @@ def _handle_review(args: argparse.Namespace) -> int:
     )
 
     stream = sys.stderr if exit_code in (1, 2, 3) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_install_skill(args: argparse.Namespace) -> int:
+    exit_code, output = run_install_skill(
+        start_path=args.repo_root,
+        agent=args.agent,
+        force=args.force,
+        as_json=args.json,
+    )
+
+    stream = sys.stderr if exit_code in (2, 4) else sys.stdout
     print(output, file=stream)
     return exit_code
 
