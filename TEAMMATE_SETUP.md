@@ -50,7 +50,7 @@ ollama pull nomic-embed-text
 
 This repo already includes a workspace config at `.synapse/config.yaml`.
 
-If needed, create one from `backend/`:
+If needed, create one from `backend/` (you dont need this since one exists):
 
 ```bash
 python -m synapse_cli.main init \
