@@ -188,6 +188,12 @@ Substeps:
   and which source supports the claim
 - warnings should include severity, confidence, and likely remediation paths
 - allow developer decisions to be stored as agent memory or review memory
+- add deterministic code-fact extraction for drift-sensitive checks so
+  thresholds, sign polarity, timing bounds, and literal comparisons do not get
+  blurred away by prose normalization
+- add a structured intermediate assessment before prose generation so Synapse
+  can reason explicitly about min/max bounds, greater-than vs less-than logic,
+  and "more permissive" vs "stricter" threshold mistakes
 
 5. Track decisions over time.
 - persist accepted warnings, dismissed warnings, and baselines

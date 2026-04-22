@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 from synapse_cli.init_command import InitOptions, run_init
+from synapse_cli.drift_check_command import _build_file_checks
 from synapse_cli.main import main
 from retrieval.schemas import RetrievalResult
 from tests.agents.conftest import _make_embedded_chunk
+from workspace.loader import load_workspace_config
 
 
 def test_cli_drift_check_inline_outputs_structured_summary(
@@ -100,6 +102,32 @@ def test_cli_drift_check_returns_error_when_workspace_missing(
 
     assert exit_code == 2
     assert "No .synapse/config.yaml found" in capsys.readouterr().err
+
+
+def test_build_file_checks_appends_deterministic_code_facts(tmp_path: Path) -> None:
+    repo_root = _init_repo(tmp_path)
+    sample_file = repo_root / "sample.py"
+    sample_file.write_text(
+        "DEFAULT_THRESHOLD_SIGMA = 2.0\n"
+        "REFRACTORY_PERIOD_MS = 0.25\n\n"
+        "def detect_spikes_bad(signal, sampling_rate, threshold_sigma=DEFAULT_THRESHOLD_SIGMA):\n"
+        "    threshold = threshold_sigma * 1.0\n"
+        "    refractory_samples = int(REFRACTORY_PERIOD_MS * sampling_rate / 1000.0)\n"
+        "    for sample in signal:\n"
+        "        if sample > threshold:\n"
+        "            return [1]\n"
+        "    return []\n",
+        encoding="utf-8",
+    )
+
+    workspace = load_workspace_config(repo_root)
+    checks = _build_file_checks(workspace, sample_file)
+
+    assert len(checks) == 1
+    query_text = checks[0]["query_text"]
+    assert "module constant DEFAULT_THRESHOLD_SIGMA = 2.0" in query_text
+    assert "module constant REFRACTORY_PERIOD_MS = 0.25" in query_text
+    assert "compares using condition `sample > threshold`" in query_text
 
 
 class _DummyVectorStore:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import json
 from pathlib import Path
 
@@ -90,10 +91,18 @@ def _build_file_checks(
         raise ValueError(f"No Python functions found in {resolved}")
 
     normalized = CodeNormalizer(should_use_llm=True).normalize_batch(raw_chunks)
+    module_constants = _extract_module_constants(source)
     return [
         {
             "label": chunk.subject or chunk.source_chunk.name or "<unknown>",
-            "query_text": chunk.embed_text,
+            "query_text": _augment_query_text(
+                base_text=chunk.embed_text,
+                raw_text=chunk.source_chunk.raw_text,
+                source=source,
+                function_name=chunk.source_chunk.name,
+                line_range=chunk.source_chunk.line_range,
+                module_constants=module_constants,
+            ),
             "source_file": str(resolved),
             "line_range": {
                 "start": chunk.source_chunk.line_range.start,
@@ -122,10 +131,18 @@ def _build_inline_checks(text: str) -> list[dict]:
         ]
 
     normalized = CodeNormalizer(should_use_llm=True).normalize_batch(raw_chunks)
+    module_constants = _extract_module_constants(text)
     return [
         {
             "label": chunk.subject or chunk.source_chunk.name or "<unknown>",
-            "query_text": chunk.embed_text,
+            "query_text": _augment_query_text(
+                base_text=chunk.embed_text,
+                raw_text=chunk.source_chunk.raw_text,
+                source=text,
+                function_name=chunk.source_chunk.name,
+                line_range=chunk.source_chunk.line_range,
+                module_constants=module_constants,
+            ),
             "source_file": "<inline>",
             "line_range": {
                 "start": chunk.source_chunk.line_range.start,
@@ -171,6 +188,132 @@ def _run_single_check(*, check: dict, store: VectorStore, k: int) -> dict:
         "used_fallback": result.get("used_fallback", False),
         "supporting_sources": supporting_sources,
     }
+
+
+def _augment_query_text(
+    *,
+    base_text: str,
+    raw_text: str,
+    source: str,
+    function_name: str,
+    line_range,
+    module_constants: dict[str, object],
+) -> str:
+    facts = _extract_code_facts(
+        source=source,
+        function_name=function_name,
+        line_range=line_range,
+        module_constants=module_constants,
+    )
+    if not facts:
+        return base_text
+    return (
+        f"{base_text}\n\n"
+        f"Deterministic code facts:\n"
+        f"- Raw source summary is derived directly from the code body.\n"
+        + "\n".join(f"- {fact}" for fact in facts)
+        + f"\n- Raw source excerpt:\n{raw_text}"
+    )
+
+
+def _extract_module_constants(source: str) -> dict[str, object]:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {}
+
+    constants: dict[str, object] = {}
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
+            continue
+        name = node.targets[0].id
+        if not name.isupper():
+            continue
+        try:
+            constants[name] = ast.literal_eval(node.value)
+        except Exception:  # noqa: BLE001
+            constants[name] = ast.unparse(node.value)
+    return constants
+
+
+def _extract_code_facts(
+    *,
+    source: str,
+    function_name: str,
+    line_range,
+    module_constants: dict[str, object],
+) -> list[str]:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+
+    target = None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+            if line_range is None or (
+                getattr(node, "lineno", None) == line_range.start
+                or _range_matches(node, line_range.start, line_range.end)
+            ):
+                target = node
+                break
+    if target is None:
+        return []
+
+    facts: list[str] = []
+    seen: set[str] = set()
+
+    def add(fact: str) -> None:
+        cleaned = fact.strip()
+        if cleaned and cleaned not in seen:
+            seen.add(cleaned)
+            facts.append(cleaned)
+
+    for node in ast.walk(target):
+        if isinstance(node, ast.Assign):
+            names = [t.id for t in node.targets if isinstance(t, ast.Name)]
+            if not names:
+                continue
+            rendered = ast.unparse(node.value)
+            for name in names:
+                add(f"assigns {name} = {rendered}")
+                for constant_name in _referenced_constants(node.value):
+                    if constant_name in module_constants:
+                        add(f"module constant {constant_name} = {module_constants[constant_name]!r}")
+
+        if isinstance(node, ast.Compare):
+            add(f"compares using condition `{ast.unparse(node)}`")
+
+        if isinstance(node, ast.Call):
+            func = ast.unparse(node.func)
+            if func == "int" and node.args:
+                add(f"rounds or truncates value derived from `{ast.unparse(node.args[0])}`")
+
+        if isinstance(node, ast.Return):
+            if node.value is not None:
+                add(f"returns `{ast.unparse(node.value)}`")
+
+    for constant_name in _referenced_constants(target):
+        if constant_name in module_constants:
+            add(f"module constant {constant_name} = {module_constants[constant_name]!r}")
+
+    return facts
+
+
+def _referenced_constants(node: ast.AST) -> set[str]:
+    names: set[str] = set()
+    for child in ast.walk(node):
+        if isinstance(child, ast.Name) and child.id.isupper():
+            names.add(child.id)
+    return names
+
+
+def _range_matches(node: ast.AST, start: int, end: int) -> bool:
+    node_start = getattr(node, "lineno", None)
+    node_end = getattr(node, "end_lineno", None)
+    return node_start == start and node_end == end
 
 
 def _determine_status(
