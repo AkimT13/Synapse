@@ -102,7 +102,7 @@ Current workspace defaults:
 2. Before editing a target Python file, run:
 
 ```bash
-cd backend && python -m synapse_cli.main review --file ../sample/code/TARGET_FILE.py --json
+synapse review --file /ABSOLUTE/PATH/TO/TARGET_FILE.py --json
 ```
 
 3. Read the drift status, findings, and supporting sources before making changes.
@@ -115,11 +115,11 @@ cd backend && python -m synapse_cli.main review --file ../sample/code/TARGET_FIL
 If review is inconclusive, use one of these:
 
 ```bash
-cd backend && python -m synapse_cli.main drift-check --file ../sample/code/TARGET_FILE.py --json
+synapse drift-check --file /ABSOLUTE/PATH/TO/TARGET_FILE.py --json
 ```
 
 ```bash
-cd backend && python -m synapse_cli.main query code "Behavior: ..." --json
+synapse query code "Behavior: ..." --json
 ```
 
 ## Final response requirements

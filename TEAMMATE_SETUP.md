@@ -23,11 +23,10 @@ What is still rough:
 From the repo root:
 
 ```bash
-cd backend
 python -m venv .venv
 source .venv/bin/activate
-pip install -e .
-pip install -r requirements-actian.txt
+pip install -e backend
+pip install -r backend/requirements-actian.txt
 ```
 
 ## 2. Start Supporting Services
@@ -35,8 +34,11 @@ pip install -r requirements-actian.txt
 From the repo root, start Actian Vector:
 
 ```bash
-docker-compose up -d
+synapse services up
 ```
+
+This materializes Synapse's runtime scaffold under `.synapse/runtime/`.
+That directory is local runtime state and is gitignored by default.
 
 If using local Ollama, make sure it is running and the required models exist:
 
@@ -50,11 +52,11 @@ ollama pull nomic-embed-text
 
 This repo already includes a workspace config at `.synapse/config.yaml`.
 
-If needed, create one from `backend/` (you dont need this since one exists):
+If needed, create one from the repo root (you dont need this since one exists):
 
 ```bash
-python -m synapse_cli.main init \
-  --repo-root .. \
+synapse init \
+  --repo-root . \
   --name synapse \
   --code sample/code \
   --knowledge sample/knowledge \
@@ -68,22 +70,22 @@ python -m synapse_cli.main init \
 Inspect status:
 
 ```bash
-python -m synapse_cli.main status
+synapse doctor
 ```
 
 ## 4. Ingest The Sample Corpus
 
-From `backend/`:
+From the repo root:
 
 ```bash
-python -m synapse_cli.main ingest
+synapse ingest
 ```
 
 If you only want code or only want knowledge:
 
 ```bash
-python -m synapse_cli.main ingest code
-python -m synapse_cli.main ingest knowledge
+synapse ingest code
+synapse ingest knowledge
 ```
 
 ## 5. Run Queries
@@ -91,25 +93,25 @@ python -m synapse_cli.main ingest knowledge
 Free-text query:
 
 ```bash
-python -m synapse_cli.main query free "How is the spike detection threshold set?"
+synapse query free "How is the spike detection threshold set?"
 ```
 
 Another useful free-text query:
 
 ```bash
-python -m synapse_cli.main query free "How does the code detect muscle contamination?"
+synapse query free "How does the code detect muscle contamination?"
 ```
 
 Code-to-knowledge query:
 
 ```bash
-python -m synapse_cli.main query code "Behavior: detects spikes using a negative threshold of 4 standard deviations below baseline."
+synapse query code "Behavior: detects spikes using a negative threshold of 4 standard deviations below baseline."
 ```
 
 Knowledge-to-code query:
 
 ```bash
-python -m synapse_cli.main query knowledge "Any spike detection algorithm must suppress detections within at least 1 millisecond of each other."
+synapse query knowledge "Any spike detection algorithm must suppress detections within at least 1 millisecond of each other."
 ```
 
 ## 6. Run Drift Detection
@@ -120,16 +122,16 @@ There is an intentionally wrong sample file here:
 
 It violates the sample knowledge base on purpose.
 
-Run drift detection from `backend/`:
+Run drift detection from the repo root:
 
 ```bash
-python -m synapse_cli.main drift-check --file ../sample/code/bad_spike_pipeline.py
+synapse drift-check --file ./sample/code/bad_spike_pipeline.py
 ```
 
 Machine-readable output:
 
 ```bash
-python -m synapse_cli.main drift-check --file ../sample/code/bad_spike_pipeline.py --json
+synapse drift-check --file ./sample/code/bad_spike_pipeline.py --json
 ```
 
 ## 7. Useful Notes
@@ -140,11 +142,11 @@ python -m synapse_cli.main drift-check --file ../sample/code/bad_spike_pipeline.
 
 ## 8. Minimal Demo Flow
 
-From `backend/`:
+From the repo root:
 
 ```bash
-python -m synapse_cli.main status
-python -m synapse_cli.main ingest
-python -m synapse_cli.main query free "How is the spike detection threshold set?"
-python -m synapse_cli.main drift-check --file ../sample/code/bad_spike_pipeline.py
+synapse doctor
+synapse ingest
+synapse query free "How is the spike detection threshold set?"
+synapse drift-check --file ./sample/code/bad_spike_pipeline.py
 ```

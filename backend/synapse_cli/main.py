@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 from synapse_cli.drift_check_command import run_drift_check
+from synapse_cli.doctor_command import run_doctor
 from synapse_cli.ingest_command import run_ingest
 from synapse_cli.install_skill_command import run_install_skill
 from synapse_cli.init_command import InitOptions, prompt_for_init_options, run_init
@@ -12,6 +13,7 @@ from synapse_cli.query_command import run_query
 from synapse_cli.reindex_command import run_reindex
 from synapse_cli.review_command import run_review
 from synapse_cli.reset_command import run_reset
+from synapse_cli.services_command import run_services
 from synapse_cli.status_command import run_status
 from synapse_cli.watch_command import run_watch
 
@@ -82,6 +84,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path inside the workspace whose .synapse/config.yaml should be loaded",
     )
     status_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    doctor_parser = subparsers.add_parser(
+        "doctor",
+        help="Run workspace and runtime preflight checks",
+    )
+    doctor_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    doctor_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    services_parser = subparsers.add_parser(
+        "services",
+        help="Manage local Synapse runtime services such as Actian VectorAI",
+    )
+    services_parser.add_argument(
+        "action",
+        choices=["up", "down", "status", "logs"],
+        help="Which service operation to run",
+    )
+    services_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose runtime services should be managed",
+    )
+    services_parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON",
@@ -295,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_init(args)
     if args.command == "status":
         return _handle_status(args)
+    if args.command == "doctor":
+        return _handle_doctor(args)
+    if args.command == "services":
+        return _handle_services(args)
     if args.command == "ingest":
         return _handle_ingest(args)
     if args.command == "query":
@@ -360,6 +401,29 @@ def _handle_status(args: argparse.Namespace) -> int:
     )
 
     stream = sys.stderr if exit_code != 0 else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_doctor(args: argparse.Namespace) -> int:
+    exit_code, output = run_doctor(
+        start_path=args.repo_root,
+        as_json=args.json,
+    )
+
+    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_services(args: argparse.Namespace) -> int:
+    exit_code, output = run_services(
+        start_path=args.repo_root,
+        action=args.action,
+        as_json=args.json,
+    )
+
+    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
     print(output, file=stream)
     return exit_code
 

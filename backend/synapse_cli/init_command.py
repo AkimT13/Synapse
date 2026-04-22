@@ -49,6 +49,11 @@ DEFAULT_KNOWLEDGE_INCLUDE = [
     "**/*.html",
 ]
 
+LOCAL_RUNTIME_GITIGNORE = [
+    ".env",
+    "runtime/",
+]
+
 
 @dataclass(frozen=True)
 class InitOptions:
@@ -129,7 +134,10 @@ def run_init(options: InitOptions) -> Path:
         encoding="utf-8",
     )
     env_example_path.write_text(_build_env_example(config), encoding="utf-8")
-    gitignore_path.write_text(".env\n", encoding="utf-8")
+    gitignore_path.write_text(
+        "".join(f"{entry}\n" for entry in LOCAL_RUNTIME_GITIGNORE),
+        encoding="utf-8",
+    )
 
     return config_path
 

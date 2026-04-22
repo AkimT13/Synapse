@@ -30,16 +30,24 @@ cd backend
 docker-compose up -d         # starts the Actian DB on localhost:50051
 ```
 
+Or, once the CLI is installed:
+
+```bash
+synapse services up
+```
+
+Synapse manages its local runtime scaffold under `.synapse/runtime/`. That
+directory is local workspace state, not project config.
+
 ### 2. Backend API (port 8000)
 
 ```bash
-cd backend
 python -m venv .venv
 source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -e .
-pip install -r requirements-actian.txt
+pip install -e backend
+pip install -r backend/requirements-actian.txt
 
-cp .env.example .env
+cp backend/.env.example backend/.env
 # Edit .env and set OPENAI_API_KEY 
 # (see "Picking models and providers" below if you want to swap
 # OpenAI for local Ollama, or change models).
@@ -47,9 +55,9 @@ cp .env.example .env
 python -m api.app         
 ```
 
-`pip install -e .` now installs the general backend and CLI dependencies.
+`pip install -e backend` now installs the general backend and CLI dependencies.
 The Actian Python client is installed separately from the bundled wheel via
-`requirements-actian.txt` so editable installs remain portable across
+`backend/requirements-actian.txt` so editable installs remain portable across
 machines.
 
 ### 3. Frontend (port 3000)
@@ -95,3 +103,25 @@ page) so the vector collection is recreated at the new dimension.
 Ollama doesn't need an API key — just run `ollama serve` and pull the
 models you want (e.g. `ollama pull llama3.1:8b`,
 `ollama pull nomic-embed-text`).
+
+## CLI
+
+The preferred CLI entrypoint is `synapse`.
+
+From the repo root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e backend
+pip install -r backend/requirements-actian.txt
+```
+
+Then use:
+
+```bash
+synapse doctor
+synapse ingest
+synapse query free "How is the spike detection threshold set?"
+synapse drift-check --file ./sample/code/bad_spike_pipeline.py
+```

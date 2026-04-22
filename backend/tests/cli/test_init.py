@@ -26,7 +26,7 @@ def test_run_init_writes_workspace_files(tmp_path: Path) -> None:
     assert path == repo_root / ".synapse" / "config.yaml"
     assert path.is_file()
     assert (repo_root / ".synapse" / ".env.example").is_file()
-    assert (repo_root / ".synapse" / ".gitignore").read_text(encoding="utf-8") == ".env\n"
+    assert (repo_root / ".synapse" / ".gitignore").read_text(encoding="utf-8") == ".env\nruntime/\n"
 
     loaded = load_workspace_config(repo_root)
     assert loaded.config.workspace.name == "demo"

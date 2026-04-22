@@ -7,24 +7,37 @@ uploaded source/knowledge files to a local `uploads/` directory.
 ## Setup
 
 ```bash
-cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -e .
-pip install -r requirements-actian.txt
+pip install -e backend
+pip install -r backend/requirements-actian.txt
 
-cp .env.example .env
+cp backend/.env.example backend/.env
 # Edit .env: set OPENAI_API_KEY, or switch providers to local Ollama.
 # See the root README for the full provider / model table.
 
+cd backend
 docker-compose up -d       # Actian VectorAI DB on localhost:50051
 python -m app.main         # API on localhost:8000
 ```
 
-`pip install -e .` installs the backend, tests, and CLI without the
+`pip install -e backend` installs the backend, tests, and CLI without the
 bundled Actian wheel so editable installs work reliably on new machines.
 To run the API or anything that touches the VectorAI client, install the
-bundled wheel separately with `pip install -r requirements-actian.txt`.
+bundled wheel separately with `pip install -r backend/requirements-actian.txt`.
+
+For the CLI, prefer the installed console entrypoint from the repo root:
+
+```bash
+synapse services up
+synapse doctor
+synapse ingest
+synapse query free "How is the spike threshold set?"
+```
+
+`synapse services up` now manages a workspace-local compose file under
+`.synapse/runtime/` rather than relying on the backend source tree as the
+runtime entrypoint.
 
 ## Smoke test (no UI)
 

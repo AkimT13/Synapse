@@ -11,7 +11,7 @@ local commands and parse structured JSON.
 ### 1. Workspace / runtime check
 
 ```bash
-python -m synapse_cli.main status --json
+synapse doctor --json
 ```
 
 Use this before running agent workflows to confirm:
@@ -23,7 +23,7 @@ Use this before running agent workflows to confirm:
 ### 2. Retrieve relevant domain context
 
 ```bash
-python -m synapse_cli.main query code "Behavior: detect spikes with a negative threshold." --json
+synapse query code "Behavior: detect spikes with a negative threshold." --json
 ```
 
 Use this before edits when the agent needs:
@@ -35,7 +35,7 @@ Use this before edits when the agent needs:
 ### 3. Review a file after edits
 
 ```bash
-python -m synapse_cli.main review --file ./sample/code/bad_spike_pipeline.py --json
+synapse review --file ./sample/code/bad_spike_pipeline.py --json
 ```
 
 This is the main agent-oriented command right now.
@@ -50,7 +50,7 @@ It combines:
 ### 4. Run a focused drift check
 
 ```bash
-python -m synapse_cli.main drift-check --file ./sample/code/bad_spike_pipeline.py --json
+synapse drift-check --file ./sample/code/bad_spike_pipeline.py --json
 ```
 
 Use this when the agent only needs:
@@ -62,7 +62,7 @@ Use this when the agent only needs:
 ### 5. Rebuild the index after model changes
 
 ```bash
-python -m synapse_cli.main reindex --json
+synapse reindex --json
 ```
 
 Use this after:
@@ -75,7 +75,7 @@ Use this after:
 
 Pre-edit:
 
-1. `status --json`
+1. `doctor --json`
 2. `query code ... --json` or `review --file ... --json`
 3. make the code change
 
