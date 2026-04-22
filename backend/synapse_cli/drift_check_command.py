@@ -95,19 +95,18 @@ def _build_file_checks(
     return [
         {
             "label": chunk.subject or chunk.source_chunk.name or "<unknown>",
-            "query_text": _augment_query_text(
-                base_text=chunk.embed_text,
-                raw_text=chunk.source_chunk.raw_text,
-                source=source,
-                function_name=chunk.source_chunk.name,
-                line_range=chunk.source_chunk.line_range,
-                module_constants=module_constants,
-            ),
+            "query_text": chunk.embed_text,
             "source_file": str(resolved),
             "line_range": {
                 "start": chunk.source_chunk.line_range.start,
                 "end": chunk.source_chunk.line_range.end,
             },
+            "signals": _extract_code_signals(
+                source=source,
+                function_name=chunk.source_chunk.name,
+                line_range=chunk.source_chunk.line_range,
+                module_constants=module_constants,
+            ),
         }
         for chunk in normalized
     ]
@@ -135,19 +134,18 @@ def _build_inline_checks(text: str) -> list[dict]:
     return [
         {
             "label": chunk.subject or chunk.source_chunk.name or "<unknown>",
-            "query_text": _augment_query_text(
-                base_text=chunk.embed_text,
-                raw_text=chunk.source_chunk.raw_text,
-                source=text,
-                function_name=chunk.source_chunk.name,
-                line_range=chunk.source_chunk.line_range,
-                module_constants=module_constants,
-            ),
+            "query_text": chunk.embed_text,
             "source_file": "<inline>",
             "line_range": {
                 "start": chunk.source_chunk.line_range.start,
                 "end": chunk.source_chunk.line_range.end,
             },
+            "signals": _extract_code_signals(
+                source=text,
+                function_name=chunk.source_chunk.name,
+                line_range=chunk.source_chunk.line_range,
+                module_constants=module_constants,
+            ),
         }
         for chunk in normalized
     ]
@@ -169,12 +167,20 @@ def _run_single_check(*, check: dict, store: VectorStore, k: int) -> dict:
         }
         for item in result["constraints"]
     ]
-    status = _determine_status(
-        has_conflict=result["has_conflict"],
-        used_fallback=result.get("used_fallback", False),
-        source_count=len(supporting_sources),
-        top_score=max((item["score"] for item in supporting_sources), default=None),
+    findings = _extract_structured_findings(
+        signals=check.get("signals") or {},
+        supporting_sources=supporting_sources,
+        confidence=_confidence_label(max((item["score"] for item in supporting_sources), default=None)),
     )
+    status = _status_from_findings(findings)
+    if status is None:
+        status = _determine_status(
+            has_conflict=result["has_conflict"],
+            used_fallback=result.get("used_fallback", False),
+            source_count=len(supporting_sources),
+            top_score=max((item["score"] for item in supporting_sources), default=None),
+        )
+    summary = _render_summary_from_findings(findings) or result["explanation"]
     confidence = _confidence_label(max((item["score"] for item in supporting_sources), default=None))
 
     return {
@@ -182,38 +188,13 @@ def _run_single_check(*, check: dict, store: VectorStore, k: int) -> dict:
         "source_file": check["source_file"],
         "line_range": check["line_range"],
         "status": status,
-        "summary": result["explanation"],
-        "violations": [result["explanation"]] if status == "conflict" else [],
+        "summary": summary,
+        "violations": [finding["summary"] for finding in findings] or ([result["explanation"]] if status == "conflict" else []),
         "confidence": confidence,
         "used_fallback": result.get("used_fallback", False),
+        "findings": findings,
         "supporting_sources": supporting_sources,
     }
-
-
-def _augment_query_text(
-    *,
-    base_text: str,
-    raw_text: str,
-    source: str,
-    function_name: str,
-    line_range,
-    module_constants: dict[str, object],
-) -> str:
-    facts = _extract_code_facts(
-        source=source,
-        function_name=function_name,
-        line_range=line_range,
-        module_constants=module_constants,
-    )
-    if not facts:
-        return base_text
-    return (
-        f"{base_text}\n\n"
-        f"Deterministic code facts:\n"
-        f"- Raw source summary is derived directly from the code body.\n"
-        + "\n".join(f"- {fact}" for fact in facts)
-        + f"\n- Raw source excerpt:\n{raw_text}"
-    )
 
 
 def _extract_module_constants(source: str) -> dict[str, object]:
@@ -302,6 +283,47 @@ def _extract_code_facts(
     return facts
 
 
+def _extract_code_signals(
+    *,
+    source: str,
+    function_name: str,
+    line_range,
+    module_constants: dict[str, object],
+) -> dict:
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return {"constants": {}, "comparisons": []}
+
+    target = None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == function_name:
+            if line_range is None or (
+                getattr(node, "lineno", None) == line_range.start
+                or _range_matches(node, line_range.start, line_range.end)
+            ):
+                target = node
+                break
+    if target is None:
+        return {"constants": {}, "comparisons": []}
+
+    comparisons: list[str] = []
+    referenced_constants = {
+        name: value
+        for name, value in module_constants.items()
+        if name in _referenced_constants(target)
+    }
+
+    for node in ast.walk(target):
+        if isinstance(node, ast.Compare):
+            comparisons.append(ast.unparse(node))
+
+    return {
+        "constants": referenced_constants,
+        "comparisons": comparisons,
+    }
+
+
 def _referenced_constants(node: ast.AST) -> set[str]:
     names: set[str] = set()
     for child in ast.walk(node):
@@ -314,6 +336,142 @@ def _range_matches(node: ast.AST, start: int, end: int) -> bool:
     node_start = getattr(node, "lineno", None)
     node_end = getattr(node, "end_lineno", None)
     return node_start == start and node_end == end
+
+
+def _extract_structured_findings(
+    *,
+    signals: dict,
+    supporting_sources: list[dict],
+    confidence: str,
+) -> list[dict]:
+    findings: list[dict] = []
+    constants = signals.get("constants", {})
+    comparisons = signals.get("comparisons", [])
+    support_text = _normalize_support_text(
+        " ".join(source["embed_text"] for source in supporting_sources)
+    )
+
+    threshold_sigma = _find_numeric_constant(constants, "THRESHOLD_SIGMA")
+    if threshold_sigma is not None and "3 to 5 standard deviations" in support_text:
+        if threshold_sigma < 3:
+            findings.append(_make_finding(
+                issue_type="threshold_range",
+                expected="threshold sigma between 3 and 5 standard deviations below baseline",
+                observed=f"threshold sigma set to {threshold_sigma}",
+                comparison="observed < minimum",
+                severity="high",
+                confidence=confidence,
+                summary=f"Configured threshold sigma {threshold_sigma} is below the required 3-5 range.",
+            ))
+        elif threshold_sigma > 5:
+            findings.append(_make_finding(
+                issue_type="threshold_range",
+                expected="threshold sigma between 3 and 5 standard deviations below baseline",
+                observed=f"threshold sigma set to {threshold_sigma}",
+                comparison="observed > maximum",
+                severity="high",
+                confidence=confidence,
+                summary=f"Configured threshold sigma {threshold_sigma} is above the required 3-5 range.",
+            ))
+
+    if "negative-going" in support_text or "negative threshold" in support_text:
+        if any(">" in comparison and "threshold" in comparison for comparison in comparisons):
+            findings.append(_make_finding(
+                issue_type="threshold_polarity",
+                expected="detect threshold crossings against a negative-going threshold",
+                observed="comparison uses a positive threshold crossing condition",
+                comparison="sign mismatch",
+                severity="high",
+                confidence=confidence,
+                summary="The code compares samples above threshold even though the protocol requires negative-going detections.",
+            ))
+
+    refractory_ms = _find_numeric_constant(constants, "REFRACTORY_PERIOD_MS")
+    if refractory_ms is not None and "at least 1 millisecond" in support_text:
+        if refractory_ms < 1:
+            findings.append(_make_finding(
+                issue_type="timing_lower_bound",
+                expected="refractory period of at least 1 millisecond",
+                observed=f"refractory period set to {refractory_ms} milliseconds",
+                comparison="observed < minimum",
+                severity="high",
+                confidence=confidence,
+                summary=f"Refractory period {refractory_ms} ms is below the required 1 ms minimum.",
+            ))
+
+    blink_rejection_uv = _find_numeric_constant(constants, "BLINK_REJECTION_UV")
+    if (
+        blink_rejection_uv is not None
+        and _contains_100_microvolt_bound(support_text)
+        and any(
+            token in support_text
+            for token in (
+                "blink",
+                "epoch",
+                "excluded",
+                "corrected",
+                "artifact",
+                "peak-to-peak",
+            )
+        )
+    ):
+        if blink_rejection_uv > 100:
+            findings.append(_make_finding(
+                issue_type="artifact_threshold",
+                expected="reject or regress epochs above 100 microvolts peak-to-peak",
+                observed=f"blink rejection threshold set to {blink_rejection_uv} microvolts",
+                comparison="observed > maximum allowed threshold",
+                severity="high",
+                confidence=confidence,
+                summary=f"Blink rejection threshold {blink_rejection_uv} uV is more permissive than the required 100 uV limit.",
+            ))
+
+    return findings
+
+
+def _find_numeric_constant(constants: dict[str, object], token: str) -> float | None:
+    for name, value in constants.items():
+        if token in name and isinstance(value, (int, float)):
+            return float(value)
+    return None
+
+
+def _normalize_support_text(text: str) -> str:
+    return (
+        text.lower()
+        .replace("μv", "microvolts")
+        .replace("µv", "microvolts")
+        .replace(" uv", " microvolts")
+    )
+
+
+def _contains_100_microvolt_bound(text: str) -> bool:
+    return (
+        "100 microvolts" in text
+        or "100 microvolt" in text
+        or "100uv" in text
+    )
+
+
+def _make_finding(
+    *,
+    issue_type: str,
+    expected: str,
+    observed: str,
+    comparison: str,
+    severity: str,
+    confidence: str,
+    summary: str,
+) -> dict:
+    return {
+        "issue_type": issue_type,
+        "expected": expected,
+        "observed": observed,
+        "comparison": comparison,
+        "severity": severity,
+        "confidence": confidence,
+        "summary": summary,
+    }
 
 
 def _determine_status(
@@ -330,6 +488,25 @@ def _determine_status(
     if used_fallback or top_score is None or top_score < 0.7:
         return "warning"
     return "aligned"
+
+
+def _status_from_findings(findings: list[dict]) -> str | None:
+    if not findings:
+        return None
+    if any(finding["severity"] == "high" for finding in findings):
+        return "conflict"
+    if any(finding["severity"] == "medium" for finding in findings):
+        return "warning"
+    return "warning"
+
+
+def _render_summary_from_findings(findings: list[dict]) -> str | None:
+    if not findings:
+        return None
+    if len(findings) == 1:
+        return findings[0]["summary"]
+    summaries = "; ".join(finding["summary"] for finding in findings)
+    return f"Detected {len(findings)} structured drift findings: {summaries}"
 
 
 def _confidence_label(score: float | None) -> str:
@@ -366,6 +543,15 @@ def _render_text_drift(payload: dict) -> str:
             f"confidence={check['confidence']}{location}"
         )
         lines.append(f"    summary: {check['summary']}")
+        if check["findings"]:
+            lines.append(f"    findings={len(check['findings'])}")
+            for finding in check["findings"]:
+                lines.append(
+                    f"    finding: {finding['issue_type']} severity={finding['severity']} "
+                    f"comparison={finding['comparison']}"
+                )
+                lines.append(f"      expected: {finding['expected']}")
+                lines.append(f"      observed: {finding['observed']}")
         lines.append(
             f"    supporting_sources={len(check['supporting_sources'])}, "
             f"used_fallback={check['used_fallback']}"

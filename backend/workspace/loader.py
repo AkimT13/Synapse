@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 from .schemas import (
     CodeRoot,
     KnowledgeRoot,
@@ -90,6 +92,7 @@ def find_workspace_root(start_path: str | Path = ".") -> Path:
 
 def load_workspace_config(start_path: str | Path = ".") -> LoadedWorkspaceConfig:
     repo_root = find_workspace_root(start_path)
+    _load_workspace_env(repo_root)
     config_path = repo_root / WORKSPACE_DIR_NAME / CONFIG_FILENAME
     raw = _read_yaml_file(config_path)
     config = WorkspaceConfig.model_validate(raw)
@@ -101,6 +104,12 @@ def load_workspace_config(start_path: str | Path = ".") -> LoadedWorkspaceConfig
         repo_root=repo_root,
         workspace_root=workspace_root,
     )
+
+
+def _load_workspace_env(repo_root: Path) -> None:
+    env_path = repo_root / WORKSPACE_DIR_NAME / ".env"
+    if env_path.is_file():
+        load_dotenv(env_path, override=False)
 
 
 def _resolve_code_root(root: CodeRoot, workspace_root: Path) -> ResolvedSourceRoot:

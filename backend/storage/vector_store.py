@@ -291,6 +291,13 @@ class VectorStore:
                 ),
             )
 
+    def reset(self) -> bool:
+        _require_actian()
+        if self.client.collections.exists(self._collection):
+            self.client.collections.delete(self._collection)
+            return True
+        return False
+
     def upsert(self, chunks: list[EmbeddedChunk]) -> int:
         return asyncio.run(self._upsert_with_batcher(chunks))
 

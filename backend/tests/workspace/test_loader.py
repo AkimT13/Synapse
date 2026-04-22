@@ -67,6 +67,29 @@ def test_load_workspace_config_raises_when_missing(tmp_path: Path) -> None:
         load_workspace_config(tmp_path)
 
 
+def test_load_workspace_config_autoloads_synapse_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    synapse_dir = repo_root / ".synapse"
+    synapse_dir.mkdir()
+    (synapse_dir / "config.yaml").write_text(_sample_config(), encoding="utf-8")
+    (synapse_dir / ".env").write_text(
+        "OPENAI_API_KEY=workspace-key\nSYNAPSE_OLLAMA_BASE_URL=http://127.0.0.1:11436\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("SYNAPSE_OLLAMA_BASE_URL", raising=False)
+
+    loaded = load_workspace_config(repo_root)
+
+    assert loaded.chat_model.api_key == "workspace-key"
+    assert loaded.embedding_model.base_url == "http://127.0.0.1:11436"
+
+
 def _sample_config() -> str:
     return """
 version: 1

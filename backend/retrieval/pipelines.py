@@ -226,6 +226,9 @@ def _detect_conflict_signal(explanation: str) -> bool:
     conflict_signals = [
         "violates", "conflict", "incorrect", "wrong", "should not",
         "must not", "exceeds", "below the", "above the", "invalid",
+        "inconsistent", "does not align", "doesn't align", "too lenient",
+        "too permissive", "fails to enforce", "fails to meet",
+        "does not adhere", "doesn't adhere", "mismatch",
     ]
     lower = explanation.lower()
     return any(signal in lower for signal in conflict_signals)

@@ -8,7 +8,11 @@ from synapse_cli.drift_check_command import run_drift_check
 from synapse_cli.ingest_command import run_ingest
 from synapse_cli.init_command import InitOptions, prompt_for_init_options, run_init
 from synapse_cli.query_command import run_query
+from synapse_cli.reindex_command import run_reindex
+from synapse_cli.review_command import run_review
+from synapse_cli.reset_command import run_reset
 from synapse_cli.status_command import run_status
+from synapse_cli.watch_command import run_watch
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -164,6 +168,95 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON",
     )
 
+    watch_parser = subparsers.add_parser(
+        "watch",
+        help="Watch configured roots and re-ingest them when files change",
+    )
+    watch_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    watch_parser.add_argument(
+        "--poll-interval",
+        type=float,
+        default=1.0,
+        help="Polling interval in seconds",
+    )
+    watch_parser.add_argument(
+        "--debounce-ms",
+        type=int,
+        help="Override debounce window in milliseconds",
+    )
+    watch_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON after the watch loop exits",
+    )
+
+    reset_parser = subparsers.add_parser(
+        "reset",
+        help="Delete the Synapse vector collection so the workspace can be reindexed cleanly",
+    )
+    reset_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    reset_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    reindex_parser = subparsers.add_parser(
+        "reindex",
+        help="Reset the Synapse collection and re-ingest the configured workspace",
+    )
+    reindex_parser.add_argument(
+        "target",
+        nargs="?",
+        choices=["all", "code", "knowledge"],
+        default="all",
+        help="Which configured roots to reindex",
+    )
+    reindex_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    reindex_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
+    review_parser = subparsers.add_parser(
+        "review",
+        help="Agent-friendly review of a file: drift findings plus supporting context",
+    )
+    review_parser.add_argument(
+        "--file",
+        required=True,
+        help="Path to a Python file to review",
+    )
+    review_parser.add_argument(
+        "--repo-root",
+        default=".",
+        help="Path inside the workspace whose .synapse/config.yaml should be loaded",
+    )
+    review_parser.add_argument(
+        "--k",
+        type=int,
+        default=5,
+        help="Number of supporting knowledge chunks to consider per check",
+    )
+    review_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON",
+    )
+
     return parser
 
 
@@ -181,6 +274,14 @@ def main(argv: list[str] | None = None) -> int:
         return _handle_query(args)
     if args.command == "drift-check":
         return _handle_drift_check(args)
+    if args.command == "watch":
+        return _handle_watch(args)
+    if args.command == "reset":
+        return _handle_reset(args)
+    if args.command == "reindex":
+        return _handle_reindex(args)
+    if args.command == "review":
+        return _handle_review(args)
 
     parser.print_help()
     return 1
@@ -275,6 +376,65 @@ def _handle_drift_check(args: argparse.Namespace) -> int:
     )
 
     stream = sys.stderr if exit_code in (1, 2) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_watch(args: argparse.Namespace) -> int:
+    progress_sink = None
+    if not args.json:
+        progress_sink = lambda message: print(message, flush=True)
+
+    exit_code, output = run_watch(
+        start_path=args.repo_root,
+        poll_interval=args.poll_interval,
+        debounce_ms=args.debounce_ms,
+        as_json=args.json,
+        progress_sink=progress_sink,
+    )
+
+    stream = sys.stderr if exit_code in (1, 2) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_reset(args: argparse.Namespace) -> int:
+    exit_code, output = run_reset(
+        start_path=args.repo_root,
+        as_json=args.json,
+    )
+
+    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_reindex(args: argparse.Namespace) -> int:
+    progress_sink = None
+    if not args.json:
+        progress_sink = lambda message: print(message, flush=True)
+
+    exit_code, output = run_reindex(
+        start_path=args.repo_root,
+        target=args.target,
+        as_json=args.json,
+        progress_sink=progress_sink,
+    )
+
+    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
+    print(output, file=stream)
+    return exit_code
+
+
+def _handle_review(args: argparse.Namespace) -> int:
+    exit_code, output = run_review(
+        start_path=args.repo_root,
+        file_path=args.file,
+        as_json=args.json,
+        k=args.k,
+    )
+
+    stream = sys.stderr if exit_code in (1, 2, 3) else sys.stdout
     print(output, file=stream)
     return exit_code
 

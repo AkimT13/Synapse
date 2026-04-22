@@ -12,6 +12,7 @@ def test_init_models_from_workspace_sets_shared_model_config_and_ollama_base_url
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("SYNAPSE_OLLAMA_BASE_URL", raising=False)
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
     synapse_dir = repo_root / ".synapse"
