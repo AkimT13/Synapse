@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": "src",
+    "outDir": "out",
+    "lib": ["ES2022"],
+    "strict": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "typeRoots": [
+      "./src/types",
+      "../frontend/node_modules/@types"
+    ]
+  },
+  "include": [
+    "src/**/*.ts"
+  ]
+}

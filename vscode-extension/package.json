@@ -1,0 +1,137 @@
+{
+  "name": "synapse-vscode-extension",
+  "displayName": "Synapse",
+  "description": "Review-centric VS Code integration for the Synapse CLI.",
+  "version": "0.1.0",
+  "private": true,
+  "publisher": "synapse-local",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onView:synapse.statusView",
+    "onView:synapse.reviewView",
+    "onView:synapse.queryView",
+    "onCommand:synapse.reviewCurrentFile",
+    "onCommand:synapse.driftCheckCurrentFile",
+    "onCommand:synapse.querySelection",
+    "onCommand:synapse.queryFreeText",
+    "onCommand:synapse.ingestWorkspace",
+    "onCommand:synapse.reindexWorkspace",
+    "onCommand:synapse.openServiceLogs",
+    "onCommand:synapse.doctor"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "synapse.reviewCurrentFile",
+        "title": "Synapse: Review Current File"
+      },
+      {
+        "command": "synapse.driftCheckCurrentFile",
+        "title": "Synapse: Drift Check Current File"
+      },
+      {
+        "command": "synapse.querySelection",
+        "title": "Synapse: Query Selection"
+      },
+      {
+        "command": "synapse.queryFreeText",
+        "title": "Synapse: Query Free Text"
+      },
+      {
+        "command": "synapse.ingestWorkspace",
+        "title": "Synapse: Ingest Workspace"
+      },
+      {
+        "command": "synapse.reindexWorkspace",
+        "title": "Synapse: Reindex Workspace"
+      },
+      {
+        "command": "synapse.openServiceLogs",
+        "title": "Synapse: Open Service Logs"
+      },
+      {
+        "command": "synapse.doctor",
+        "title": "Synapse: Doctor"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "synapse",
+          "title": "Synapse",
+          "icon": "media/synapse.svg"
+        }
+      ]
+    },
+    "views": {
+      "synapse": [
+        {
+          "id": "synapse.statusView",
+          "name": "Status"
+        },
+        {
+          "id": "synapse.reviewView",
+          "name": "Review"
+        },
+        {
+          "id": "synapse.queryView",
+          "name": "Query"
+        }
+      ]
+    },
+    "menus": {
+      "editor/title": [
+        {
+          "command": "synapse.reviewCurrentFile",
+          "group": "navigation",
+          "when": "resourceScheme == file"
+        },
+        {
+          "command": "synapse.driftCheckCurrentFile",
+          "group": "navigation",
+          "when": "resourceScheme == file"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "synapse.querySelection",
+          "group": "navigation",
+          "when": "editorHasSelection"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "synapse.reviewCurrentFile",
+          "group": "navigation",
+          "when": "explorerResourceIsFile"
+        },
+        {
+          "command": "synapse.driftCheckCurrentFile",
+          "group": "navigation",
+          "when": "explorerResourceIsFile"
+        },
+        {
+          "command": "synapse.ingestWorkspace",
+          "group": "navigation",
+          "when": "explorerResourceIsFolder"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node ./src/scripts/run-tsc.mjs -p .",
+    "watch": "node ./src/scripts/run-tsc.mjs -p . -w",
+    "test": "npm run build && node --test test/**/*.test.js",
+    "check": "npm test"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
