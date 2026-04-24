@@ -16,11 +16,17 @@ def test_cli_reindex_runs_reset_then_ingest(
 ) -> None:
     repo_root = _init_repo(tmp_path)
 
+    import json as _json
     monkeypatch.setattr(
         "synapse_cli.main.run_reindex",
         lambda **kwargs: (
             0,
-            "Workspace: reindex-demo\nTarget: all\nReset: deleted_collection=True\n\nResults:\n  - code code: files=1, parsed=2, stored=2, errors=0",
+            _json.dumps({
+                "workspace": "reindex-demo",
+                "target": "all",
+                "reset": {"workspace": "reindex-demo", "collection": "chunks", "deleted": True},
+                "ingest": {"workspace": "reindex-demo", "target": "all", "summaries": [], "progress": []},
+            }),
         ),
     )
 

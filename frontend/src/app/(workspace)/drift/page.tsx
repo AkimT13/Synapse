@@ -1,28 +1,22 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 
+import { DriftDashboard } from "@/components/drift/DriftDashboard";
 import { DriftEvidencePane } from "@/components/drift/DriftEvidencePane";
 import { DriftFileTreePane } from "@/components/drift/DriftFileTreePane";
 import { DriftReviewStage } from "@/components/drift/DriftReviewStage";
+import { useScanQueue } from "@/hooks/useScanQueue";
 import {
   corpora,
   review,
   type FileReviewResponse,
   type TreeNode,
 } from "@/lib/api";
-
-function firstFile(node: TreeNode): string | null {
-  if (node.type === "file") return node.path;
-  for (const child of node.children ?? []) {
-    const found = firstFile(child);
-    if (found) return found;
-  }
-  return null;
-}
+import { useDriftStore } from "@/lib/drift-store";
 
 export default function DriftPage() {
   return (
@@ -36,6 +30,14 @@ function DriftPageInner() {
   const searchParams = useSearchParams();
   const requestedFile = searchParams.get("file");
   const [activePath, setActivePath] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const view = useDriftStore((s) => s.view);
+  const setView = useDriftStore((s) => s.setView);
+  const results = useDriftStore((s) => s.results);
+
+  // Drive the scan queue
+  useScanQueue();
 
   const treeQuery = useQuery({
     queryKey: ["code-tree"],
@@ -45,20 +47,31 @@ function DriftPageInner() {
   useEffect(() => {
     if (requestedFile && requestedFile !== activePath) {
       setActivePath(requestedFile);
+      setView("detail");
       return;
     }
-    if (!requestedFile && treeQuery.data && !activePath) {
-      const initial = firstFile(treeQuery.data);
-      if (initial) setActivePath(initial);
-    }
-  }, [requestedFile, treeQuery.data, activePath]);
+  }, [requestedFile, activePath, setView]);
 
   const reviewQuery = useQuery<FileReviewResponse>({
     queryKey: ["drift-review", activePath],
     queryFn: () => review.file({ path: activePath as string }),
-    enabled: Boolean(activePath),
+    enabled: Boolean(activePath) && view === "detail",
     retry: false,
+    staleTime: 5 * 60 * 1000,
   });
+
+  // When selecting a file from the dashboard, seed React Query cache from Zustand
+  const handleSelectFile = useCallback(
+    (path: string) => {
+      const cached = results.get(path);
+      if (cached) {
+        queryClient.setQueryData(["drift-review", path], cached.response);
+      }
+      setActivePath(path);
+      setView("detail");
+    },
+    [results, queryClient, setView],
+  );
 
   if (treeQuery.isSuccess && (!treeQuery.data.children || treeQuery.data.children.length === 0)) {
     return (
@@ -87,6 +100,11 @@ function DriftPageInner() {
 
   const treeRoot =
     treeQuery.data ?? ({ name: "root", path: "", type: "dir", children: [] } as TreeNode);
+
+  if (view === "dashboard") {
+    return <DriftDashboard root={treeRoot} onSelectFile={handleSelectFile} />;
+  }
+
   const error =
     reviewQuery.error instanceof Error ? reviewQuery.error.message : null;
 
@@ -95,7 +113,7 @@ function DriftPageInner() {
       <DriftFileTreePane
         root={treeRoot}
         activePath={activePath}
-        onSelect={setActivePath}
+        onSelect={handleSelectFile}
       />
       <DriftReviewStage
         filePath={activePath}

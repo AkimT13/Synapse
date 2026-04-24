@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json as _json
 import sys
 from pathlib import Path
 
@@ -353,8 +354,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "install-skill":
         return _handle_install_skill(args)
 
-    parser.print_help()
-    return 1
+    from synapse_cli.ui import print_banner, run_interactive_menu
+    print_banner()
+    return run_interactive_menu(args.repo_root if hasattr(args, "repo_root") else ".")
 
 
 def _handle_init(args: argparse.Namespace) -> int:
@@ -406,13 +408,20 @@ def _handle_status(args: argparse.Namespace) -> int:
 
 
 def _handle_doctor(args: argparse.Namespace) -> int:
-    exit_code, output = run_doctor(
-        start_path=args.repo_root,
-        as_json=args.json,
-    )
+    if args.json:
+        exit_code, output = run_doctor(start_path=args.repo_root, as_json=True)
+        stream = sys.stderr if exit_code in (2, 3) else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
-    print(output, file=stream)
+    from synapse_cli import ui
+
+    with ui.spinner("Running checks…"):
+        exit_code, json_output = run_doctor(start_path=args.repo_root, as_json=True)
+    if exit_code == 2:
+        print(json_output, file=sys.stderr)
+        return exit_code
+    ui.render_doctor(_json.loads(json_output))
     return exit_code
 
 
@@ -429,47 +438,94 @@ def _handle_services(args: argparse.Namespace) -> int:
 
 
 def _handle_ingest(args: argparse.Namespace) -> int:
-    progress_sink = None
-    if not args.json:
-        progress_sink = lambda message: print(f"[progress] {message}", flush=True)
+    if args.json:
+        exit_code, output = run_ingest(
+            start_path=args.repo_root,
+            target=args.target,
+            as_json=True,
+        )
+        stream = sys.stderr if exit_code == 2 else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    exit_code, output = run_ingest(
+    from synapse_cli import ui
+
+    messages: list[str] = []
+
+    def rich_progress_sink(message: str) -> None:
+        messages.append(message)
+        ui.console.print(f"  [dim]{message}[/dim]")
+
+    exit_code, json_output = run_ingest(
         start_path=args.repo_root,
         target=args.target,
-        as_json=args.json,
-        progress_sink=progress_sink,
+        as_json=True,
+        progress_sink=rich_progress_sink,
     )
-
-    stream = sys.stderr if exit_code == 2 else sys.stdout
-    print(output, file=stream)
+    if exit_code == 2:
+        ui.console.print(f"[red]{json_output}[/red]")
+        return exit_code
+    ui.render_ingest(_json.loads(json_output))
     return exit_code
 
 
 def _handle_query(args: argparse.Namespace) -> int:
-    exit_code, output = run_query(
-        start_path=args.repo_root,
-        mode=args.mode,
-        text=args.text,
-        as_json=args.json,
-        k=args.k,
-    )
+    if args.json:
+        exit_code, output = run_query(
+            start_path=args.repo_root,
+            mode=args.mode,
+            text=args.text,
+            as_json=True,
+            k=args.k,
+        )
+        stream = sys.stderr if exit_code == 2 else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    stream = sys.stderr if exit_code == 2 else sys.stdout
-    print(output, file=stream)
+    from synapse_cli import ui
+
+    with ui.spinner("Querying…"):
+        exit_code, json_output = run_query(
+            start_path=args.repo_root,
+            mode=args.mode,
+            text=args.text,
+            as_json=True,
+            k=args.k,
+        )
+    if exit_code == 2:
+        ui.console.print(f"[red]{json_output}[/red]")
+        return exit_code
+    ui.render_query(_json.loads(json_output))
     return exit_code
 
 
 def _handle_drift_check(args: argparse.Namespace) -> int:
-    exit_code, output = run_drift_check(
-        start_path=args.repo_root,
-        text=args.text,
-        file_path=args.file,
-        as_json=args.json,
-        k=args.k,
-    )
+    if args.json:
+        exit_code, output = run_drift_check(
+            start_path=args.repo_root,
+            text=args.text,
+            file_path=args.file,
+            as_json=True,
+            k=args.k,
+        )
+        stream = sys.stderr if exit_code in (1, 2) else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    stream = sys.stderr if exit_code in (1, 2) else sys.stdout
-    print(output, file=stream)
+    from synapse_cli import ui
+
+    with ui.spinner("Analyzing…"):
+        exit_code, json_output = run_drift_check(
+            start_path=args.repo_root,
+            text=args.text,
+            file_path=args.file,
+            as_json=True,
+            k=args.k,
+        )
+    if exit_code in (1, 2):
+        ui.console.print(f"[red]{json_output}[/red]")
+        return exit_code
+    ui.render_drift(_json.loads(json_output))
     return exit_code
 
 
@@ -503,32 +559,59 @@ def _handle_reset(args: argparse.Namespace) -> int:
 
 
 def _handle_reindex(args: argparse.Namespace) -> int:
-    progress_sink = None
-    if not args.json:
-        progress_sink = lambda message: print(message, flush=True)
+    if args.json:
+        exit_code, output = run_reindex(
+            start_path=args.repo_root,
+            target=args.target,
+            as_json=True,
+        )
+        stream = sys.stderr if exit_code in (2, 3) else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    exit_code, output = run_reindex(
+    from synapse_cli import ui
+
+    def rich_progress_sink(message: str) -> None:
+        ui.console.print(f"  [dim]{message}[/dim]")
+
+    exit_code, json_output = run_reindex(
         start_path=args.repo_root,
         target=args.target,
-        as_json=args.json,
-        progress_sink=progress_sink,
+        as_json=True,
+        progress_sink=rich_progress_sink,
     )
-
-    stream = sys.stderr if exit_code in (2, 3) else sys.stdout
-    print(output, file=stream)
+    if exit_code in (2, 3):
+        ui.console.print(f"[red]{json_output}[/red]")
+        return exit_code
+    ui.render_reindex(_json.loads(json_output))
     return exit_code
 
 
 def _handle_review(args: argparse.Namespace) -> int:
-    exit_code, output = run_review(
-        start_path=args.repo_root,
-        file_path=args.file,
-        as_json=args.json,
-        k=args.k,
-    )
+    if args.json:
+        exit_code, output = run_review(
+            start_path=args.repo_root,
+            file_path=args.file,
+            as_json=True,
+            k=args.k,
+        )
+        stream = sys.stderr if exit_code in (1, 2, 3) else sys.stdout
+        print(output, file=stream)
+        return exit_code
 
-    stream = sys.stderr if exit_code in (1, 2, 3) else sys.stdout
-    print(output, file=stream)
+    from synapse_cli import ui
+
+    with ui.spinner("Analyzing…"):
+        exit_code, json_output = run_review(
+            start_path=args.repo_root,
+            file_path=args.file,
+            as_json=True,
+            k=args.k,
+        )
+    if exit_code in (1, 2, 3):
+        ui.console.print(f"[red]{json_output}[/red]")
+        return exit_code
+    ui.render_review(_json.loads(json_output))
     return exit_code
 
 

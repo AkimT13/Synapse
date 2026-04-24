@@ -17,6 +17,7 @@ dependencies = [
     "sse-starlette==3.3.4",
     "aiosqlite==0.22.1",
     "python-multipart==0.0.26",
+    "rich>=13.0",
 ]
 
 [project.scripts]

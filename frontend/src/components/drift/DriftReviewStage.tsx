@@ -1,14 +1,15 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, FileWarning, Microscope } from "lucide-react";
+import { FileWarning, Microscope } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/cn";
 import type {
   FileReviewResponse,
   ReviewCheck,
   ReviewFinding,
-  ReviewStatus,
 } from "@/lib/api";
+import { StatusBadge, ConfidenceBadge, STATUS_COPY } from "./StatusBadge";
 
 interface DriftReviewStageProps {
   filePath: string | null;
@@ -17,31 +18,12 @@ interface DriftReviewStageProps {
   error: string | null;
 }
 
-const STATUS_COPY: Record<
-  ReviewStatus,
-  { label: string; scientist: string; tone: string }
-> = {
-  aligned: {
-    label: "Aligned",
-    scientist: "Current code behavior appears consistent with the indexed constraint set.",
-    tone: "calm",
-  },
-  warning: {
-    label: "Warning",
-    scientist: "The evidence is incomplete or ambiguous enough that this file needs review.",
-    tone: "caution",
-  },
-  conflict: {
-    label: "Conflict",
-    scientist: "The code appears to diverge from the indexed scientific or protocol constraints.",
-    tone: "alert",
-  },
-  unknown: {
-    label: "Unknown",
-    scientist: "Synapse could not form a reliable review from the indexed evidence yet.",
-    tone: "neutral",
-  },
-};
+const LOADING_STEPS = [
+  { label: "Reading source code", delay: 0 },
+  { label: "Extracting behaviors", delay: 2000 },
+  { label: "Matching against constraints", delay: 5000 },
+  { label: "Compiling review report", delay: 8000 },
+];
 
 export function DriftReviewStage({
   filePath,
@@ -69,7 +51,10 @@ export function DriftReviewStage({
         {!filePath ? (
           <div className="empty">Choose a file from the review queue to begin.</div>
         ) : loading ? (
-          <div className="empty">Reviewing code against indexed constraints…</div>
+          <div className="drift-stage-scroll">
+            <ReviewSkeleton />
+            <ReviewLoadingState />
+          </div>
         ) : error ? (
           <ReviewErrorState error={error} />
         ) : !review ? (
@@ -126,6 +111,51 @@ export function DriftReviewStage({
         )}
       </div>
     </section>
+  );
+}
+
+function ReviewSkeleton() {
+  return (
+    <div className="drift-hero" style={{ opacity: 0.5 }}>
+      <div className="drift-hero-copy">
+        <div className="skel-line skel-sm" />
+        <div className="skel-line skel-lg" style={{ height: 28, marginTop: 12 }} />
+        <div className="skel-line skel-full" style={{ marginTop: 10 }} />
+        <div className="skel-line skel-md" style={{ marginTop: 6 }} />
+      </div>
+      <div className="drift-hero-metrics">
+        <div className="drift-metric"><div className="skel-line skel-sm" /><div className="skel-line skel-md" style={{ height: 24, marginTop: 8 }} /></div>
+        <div className="drift-metric"><div className="skel-line skel-sm" /><div className="skel-line skel-md" style={{ height: 24, marginTop: 8 }} /></div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewLoadingState() {
+  const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    for (let i = 1; i < LOADING_STEPS.length; i++) {
+      timers.push(setTimeout(() => setActiveStep(i), LOADING_STEPS[i].delay));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div className="drift-loading-stepper">
+      {LOADING_STEPS.map((step, i) => {
+        const state = i < activeStep ? "is-done" : i === activeStep ? "is-active" : "is-pending";
+        return (
+          <div key={step.label} className={cn("drift-step", state)}>
+            <div className="drift-step-indicator">
+              {state === "is-active" && <span className="drift-step-pulse" />}
+            </div>
+            <span>{step.label}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -232,25 +262,4 @@ function Metric({
       <strong>{value}</strong>
     </div>
   );
-}
-
-function StatusBadge({
-  status,
-  large = false,
-}: {
-  status: ReviewStatus;
-  large?: boolean;
-}) {
-  const Icon =
-    status === "aligned" ? CheckCircle2 : status === "conflict" ? AlertTriangle : Microscope;
-  return (
-    <span className={cn("drift-status-badge", `is-${status}`, large && "is-large")}>
-      <Icon size={large ? 15 : 13} />
-      {STATUS_COPY[status].label}
-    </span>
-  );
-}
-
-function ConfidenceBadge({ value }: { value: string }) {
-  return <span className={cn("drift-confidence-badge", `is-${value}`)}>{value} confidence</span>;
 }

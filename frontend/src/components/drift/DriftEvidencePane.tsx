@@ -27,7 +27,11 @@ export function DriftEvidencePane({
 
       <div className="pane-body">
         {loading ? (
-          <div className="empty">Collecting supporting evidence…</div>
+          <div className="drift-evidence-scroll">
+            <EvidenceSkeleton />
+            <EvidenceSkeleton />
+            <EvidenceSkeleton />
+          </div>
         ) : error ? (
           <div className="empty">Evidence will appear here once a review payload is available.</div>
         ) : !review ? (
@@ -80,6 +84,20 @@ export function DriftEvidencePane({
         )}
       </div>
     </section>
+  );
+}
+
+function EvidenceSkeleton() {
+  return (
+    <div className="drift-evidence-card" style={{ opacity: 0.5 }}>
+      <div className="drift-evidence-card-head">
+        <div className="skel-line skel-sm" />
+        <div className="skel-line skel-sm" style={{ width: 48 }} />
+      </div>
+      <div className="skel-line skel-md" style={{ marginTop: 10 }} />
+      <div className="skel-line skel-full" style={{ marginTop: 8 }} />
+      <div className="skel-line skel-lg" style={{ marginTop: 4 }} />
+    </div>
   );
 }
 

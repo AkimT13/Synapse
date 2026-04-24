@@ -28,8 +28,8 @@ def test_cli_doctor_reports_successful_preflight(
     out = capsys.readouterr().out
     assert "Overall: ok" in out
     assert "Runtime compose:" in out
-    assert "workspace_config: ok" in out
-    assert "actian_service: ok" in out
+    assert "workspace_config" in out
+    assert "actian_service" in out
 
 
 def test_cli_doctor_json_reports_failures(
