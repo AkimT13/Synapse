@@ -27,6 +27,35 @@ Synapse should now be developed with a hub-integrated multi-agent loop:
 The workflow details live in `MULTI_AGENT_WORKFLOW.md` and the live session
 contract lives in `MULTI_AGENT_STATUS.md`.
 
+## Current Execution Queue
+
+The milestone list below is both strategic direction and the ordered queue for
+the multi-agent loop. The hub should not try to execute every open idea in one
+unbounded run. It should work top-down through the queue, one milestone or
+sub-milestone at a time, and stop at each integration point for verification.
+
+Near-term queue:
+
+1. VS Code extension demo polish
+- make the extension easy to install, explain, and demo live
+- make empty states, setup failures, and review/query outputs legible
+- add the smallest useful path toward inline diagnostics after the panel flow is solid
+
+2. Scientist-facing GUI drift review
+- make the browser UI better for domain experts who need to inspect code drift
+- emphasize evidence, constraints, conflicts, and remediation over generic search results
+- make drift review understandable without needing to read raw source code first
+
+3. Demo flow hardening
+- reduce setup ambiguity across CLI, GUI, and extension
+- tighten onboarding and health-check paths
+- make recovery steps obvious when models, services, or corpora are missing
+
+4. Agent review workflow hardening
+- strengthen pre-edit and post-edit Synapse usage patterns
+- make review outputs more machine-usable and summary-friendly
+- keep the multi-agent loop working from explicit contracts instead of ad hoc prompting
+
 ## Product Direction
 
 Synapse should evolve into a domain runtime for software development:
@@ -254,6 +283,51 @@ Substeps:
 - let users tune strictness, trigger modes, and watched scopes
 - allow per-workspace domain settings
 - support both local and team-shared policies later
+
+## Milestone 4A: Make The GUI Scientist-Friendly For Drift Review
+
+Goal: make the browser UI useful to scientists and domain experts who want to
+see where code appears to drift from documented constraints, not just browse
+retrieval results.
+
+Why this matters:
+- many domain experts will not start in VS Code
+- scientists need evidence, comparisons, and decision language more than generic
+  code search
+- the current GUI is good for exploration, but it is not yet optimized for
+  reviewing likely code drift as a first-class workflow
+
+Substeps:
+
+1. Add a first-class drift review workspace view.
+- show likely drift findings as a dedicated surface, not just as side effects of retrieval
+- let users move from a flagged code region to the supporting domain evidence quickly
+- support review across both code-first and knowledge-first entry points
+
+2. Make evidence presentation domain-friendly.
+- show constraints, conditions, ranges, units, and failure modes as structured cards
+- distinguish source evidence from model-generated explanation
+- keep citations and confidence visually obvious
+
+3. Add code-vs-constraint comparison framing.
+- present extracted code facts next to retrieved or normalized domain constraints
+- highlight where values, polarity, timing, or validation behavior appear to disagree
+- make “aligned”, “warning”, and “conflict” feel like different review states, not just labels
+
+4. Improve the ask/review experience for scientists.
+- support questions such as “where does this protocol appear to be violated?”
+- summarize likely drift in plain domain language before showing implementation detail
+- make follow-up sources easy to inspect without losing the current review context
+
+5. Capture review decisions in the GUI.
+- allow users to mark findings as accepted, dismissed, or needing follow-up
+- show why a warning exists and what was previously decided
+- keep the UI ready for future memory-backed review history
+
+6. Make the GUI demoable for non-programmers.
+- improve wording, labels, and empty states so the product can be explained to a scientist
+- reduce visual emphasis on implementation details when domain evidence should come first
+- make the main review path usable in a short live demo without facilitator translation
 
 ## Milestone 5: Integrate With Coding Agents
 
