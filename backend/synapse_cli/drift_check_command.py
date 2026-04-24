@@ -189,7 +189,7 @@ def _run_single_check(*, check: dict, store: VectorStore, k: int) -> dict:
         "line_range": check["line_range"],
         "status": status,
         "summary": summary,
-        "violations": [finding["summary"] for finding in findings] or ([result["explanation"]] if status == "conflict" else []),
+        "violations": [finding["summary"] for finding in findings],
         "confidence": confidence,
         "used_fallback": result.get("used_fallback", False),
         "findings": findings,

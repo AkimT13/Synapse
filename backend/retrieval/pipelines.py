@@ -230,7 +230,17 @@ def _detect_conflict_signal(explanation: str) -> bool:
         "too permissive", "fails to enforce", "fails to meet",
         "does not adhere", "doesn't adhere", "mismatch",
     ]
+    # If the explanation leads with a consistency statement the LLM has
+    # determined there is no conflict — conflict signals below that are
+    # likely paraphrased constraint language, not code violations.
+    consistency_signals = [
+        "is consistent", "appears consistent",
+        "no conflict", "no violation", "correctly implements",
+        "is compliant", "adheres to", "aligns with",
+    ]
     lower = explanation.lower()
+    if any(signal in lower[:300] for signal in consistency_signals):
+        return False
     return any(signal in lower for signal in conflict_signals)
 
 

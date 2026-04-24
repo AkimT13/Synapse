@@ -1,0 +1,62 @@
+version: 1
+workspace:
+  name: sample
+  root: .
+sources:
+  code_roots:
+  - path: code
+    include:
+    - '**/*.py'
+    - '**/*.ts'
+    - '**/*.tsx'
+    - '**/*.js'
+    - '**/*.jsx'
+    exclude: []
+    language_hints: []
+  knowledge_roots:
+  - path: knowledge
+    include:
+    - '**/*.md'
+    - '**/*.pdf'
+    - '**/*.docx'
+    - '**/*.txt'
+    - '**/*.html'
+    exclude: []
+    kinds:
+    - reference
+filters:
+  global_exclude:
+  - '**/.git/**'
+  - '**/.venv/**'
+  - '**/__pycache__/**'
+  - '**/node_modules/**'
+  - '**/.next/**'
+  - '**/*.egg-info/**'
+domains:
+- name: domain-aware-development
+  tags: []
+models:
+  chat:
+    provider: openai
+    model: gpt-4o-mini
+    api_key_env: OPENAI_API_KEY
+  embeddings:
+    provider: openai
+    model: text-embedding-3-large
+    api_key_env: OPENAI_API_KEY
+runtime:
+  ollama:
+    base_url: http://localhost:11434
+    base_url_env: SYNAPSE_OLLAMA_BASE_URL
+ingestion:
+  auto_ingest_on_init: false
+  follow_symlinks: false
+  max_file_size_mb: 25
+watch:
+  enabled: true
+  debounce_ms: 1500
+retrieval:
+  default_top_k: 8
+drift_checks:
+  enabled: true
+  severity_threshold: medium
