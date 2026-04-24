@@ -94,6 +94,19 @@ This avoids extra infrastructure:
 - same commands work for humans and agents
 - easier to version and debug
 
+## Multi-Agent Loop
+
+For repeated parallel implementation work, Synapse uses a hub-and-spoke model.
+
+- one hub agent owns milestone planning, integration, verification, commits,
+  and pushes
+- worker agents own bounded tasks with explicit file or module ownership
+- the hub maintains the live cycle contract in `MULTI_AGENT_STATUS.md`
+- the operating rules live in `MULTI_AGENT_WORKFLOW.md`
+
+Before starting a long-running multi-agent loop, create a sentinel commit so
+the entire run has an obvious rollback anchor.
+
 An MCP server may make sense later if:
 
 - repeated calls become too slow

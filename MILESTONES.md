@@ -12,6 +12,21 @@ The emphasis is on workflows that fit how developers actually work:
 - inside coding agents such as Codex and Claude Code
 - in the existing GUI for ingestion, browsing, and investigation
 
+## Default Delivery Mode
+
+Synapse should now be developed with a hub-integrated multi-agent loop:
+
+- one hub agent owns milestone planning, integration, verification, commits,
+  and pushes
+- worker agents own bounded tasks in parallel
+- every cycle starts from an explicit task contract and ends with a
+  verification gate
+- a sentinel commit marks the start of the coordinated loop so rollback stays
+  simple if the work drifts
+
+The workflow details live in `MULTI_AGENT_WORKFLOW.md` and the live session
+contract lives in `MULTI_AGENT_STATUS.md`.
+
 ## Product Direction
 
 Synapse should evolve into a domain runtime for software development:
@@ -258,22 +273,29 @@ Substeps:
 - run a drift check on a proposed change
 - store a decision or review memory
 
-2. Make these primitives available in machine-friendly form.
+2. Standardize multi-agent execution.
+- make the CLI-first agent workflow the default operating surface
+- define hub vs worker responsibilities for bounded parallel cycles
+- require a live cycle contract and a verification gate for integration
+- keep rollback simple with a sentinel commit at the start of each long-running
+  coordinated agent loop
+
+3. Make these primitives available in machine-friendly form.
 - CLI commands with JSON output
 - a local HTTP API if needed
 - clear request and response schemas with citations and confidence fields
 
-3. Support pre-edit and post-edit workflows.
+4. Support pre-edit and post-edit workflows.
 - before editing: fetch relevant constraints and warnings
 - during editing: query a specific function or patch
 - after editing: run a drift review over the changed code
 
-4. Create promptable integration patterns.
+5. Create promptable integration patterns.
 - "before writing code in this file, ask Synapse for related domain constraints"
 - "after modifying this function, run a Synapse drift check"
 - "when a warning is dismissed, record the rationale as memory"
 
-5. Add review-oriented summaries.
+6. Add review-oriented summaries.
 - summarize likely domain risks in a diff
 - highlight changes that alter thresholds, ranges, units, or safety checks
 - generate source-backed review notes instead of vague comments

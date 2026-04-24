@@ -125,3 +125,14 @@ synapse ingest
 synapse query free "How is the spike detection threshold set?"
 synapse drift-check --file ./sample/code/bad_spike_pipeline.py
 ```
+
+## Multi-agent Development
+
+Synapse's default parallel delivery model is a hub-and-spoke multi-agent loop.
+
+- `MULTI_AGENT_WORKFLOW.md` defines the operating rules
+- `MULTI_AGENT_STATUS.md` is the live cycle contract and status log
+- `AGENT_INTEGRATION.md` covers the CLI commands agents should use
+
+Before starting a long-running coordinated agent session, create a sentinel
+commit so the loop has a clear rollback anchor.
