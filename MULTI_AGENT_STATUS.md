@@ -11,28 +11,28 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Current Milestone
 
-- Milestone: make the VS Code extension demo-ready
-- Goal: make the extension installable, legible in-demo, and resilient when Synapse is not fully set up
+- Milestone: make the GUI scientist-friendly for drift review
+- Goal: add a browser-based drift review workflow that emphasizes evidence, comparison, and review states over generic retrieval
 - Success criteria:
-  - extension build and tests pass
-  - side-panel output is readable enough for a live demo
-  - setup and failure states are actionable instead of opaque
-  - README and package metadata are sufficient for install/demo handoff
+  - the GUI has a dedicated drift review surface
+  - uploaded code files can be reviewed through an API-backed drift workflow
+  - evidence and conflicts are presented in a scientist-friendly format
+  - frontend and backend verification for the new flow pass
 
 ## Worker Ownership
 
 - Hub:
   - integration
-  - command/status behavior
+  - route integration
+  - cross-surface contract cleanup
   - verification
   - commits and pushes
 - Worker A:
-  - `vscode-extension/src/views`
-  - `vscode-extension/src/state`
+  - backend API review surface
+  - API tests
 - Worker B:
-  - `vscode-extension/README.md`
-  - `vscode-extension/package.json`
-  - packaging/demo-facing test adjustments if needed
+  - frontend drift review page and components
+  - navigation and frontend tests if needed
 
 ## Shared Contracts
 
@@ -52,10 +52,10 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Current Cycle Tasks
 
-- Improve extension command and status behavior for live demo use
-- Improve side-panel readability and empty states
-- Tighten extension package metadata and demo instructions
-- Re-run extension build and tests before integration
+- Add an API-backed drift review endpoint for uploaded code files
+- Add a scientist-friendly drift review page to the GUI
+- Connect the new page into workspace navigation
+- Re-run frontend and backend verification before integration
 
 ## Blockers
 
@@ -63,9 +63,9 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Latest Cycle Summary
 
-- Demo-oriented extension metadata, welcome content, and README guidance landed
-- Side-panel views now present grouped status, review, and query output with clearer empty states
-- Command handling now falls back to the workspace root, auto-refreshes status on context changes, and offers actionable error follow-up
+- Added a dedicated `/drift` workspace page for scientist-friendly browser review
+- Added an API-backed `/api/review/file` flow that reuses the existing CLI-style review payload
+- Connected drift review into the workspace sidebar and added evidence/comparison-focused UI treatment
 - Verification:
-  - `npm run build` in `vscode-extension/`
-  - `npm test` in `vscode-extension/`
+  - `../.venv/bin/python -m pytest tests/api/test_review.py tests/cli/test_review.py -q` in `backend/`
+  - `npx tsc --noEmit` in `frontend/`

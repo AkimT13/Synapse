@@ -72,12 +72,13 @@ def health() -> dict:
 
 # Routers are attached in package-level imports so circular-import
 # concerns stay contained.
-from api import chat, corpora, ingestion, retrieval, workspace  # noqa: E402
+from api import chat, corpora, ingestion, retrieval, review, workspace  # noqa: E402
 
 app.include_router(workspace.router, prefix="/api/workspace", tags=["workspace"])
 app.include_router(corpora.router, prefix="/api/corpora", tags=["corpora"])
 app.include_router(ingestion.router, prefix="/api/ingest", tags=["ingest"])
 app.include_router(retrieval.router, prefix="/api", tags=["retrieval"])
+app.include_router(review.router, prefix="/api/review", tags=["review"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 
 

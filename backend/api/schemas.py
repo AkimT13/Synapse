@@ -6,7 +6,7 @@ is internal. Keep them decoupled.
 """
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,6 +49,67 @@ class KnowledgeToCodeRequest(BaseModel):
 class FreeTextRequest(BaseModel):
     question: str
     k: int = 10
+
+
+# -- review -----------------------------------------------------------------
+
+
+class ReviewRequest(BaseModel):
+    path: str
+    k: int = 5
+
+
+class ReviewLineRange(BaseModel):
+    start: int
+    end: int
+
+
+class ReviewFinding(BaseModel):
+    issue_type: str
+    expected: str
+    observed: str
+    comparison: str
+    severity: str
+    confidence: str
+    summary: str
+
+
+class ReviewSource(BaseModel):
+    source_file: str
+    chunk_type: Literal["code", "knowledge"]
+    kind: str | None = None
+    score: float
+    embed_text: str
+
+
+class ReviewCheck(BaseModel):
+    label: str
+    source_file: str
+    line_range: ReviewLineRange | None = None
+    status: Literal["aligned", "warning", "conflict", "unknown"]
+    summary: str
+    violations: list[str] = Field(default_factory=list)
+    confidence: str
+    used_fallback: bool = False
+    query_text: str
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    supporting_sources: list[ReviewSource] = Field(default_factory=list)
+
+
+class ReviewContextEntry(BaseModel):
+    label: str
+    query_text: str
+    has_conflict: bool
+    used_fallback: bool = False
+    sources: list[ReviewSource] = Field(default_factory=list)
+
+
+class ReviewResponse(BaseModel):
+    workspace: str
+    target: str
+    drift_status: Literal["aligned", "warning", "conflict", "unknown"]
+    drift: list[ReviewCheck] = Field(default_factory=list)
+    context: list[ReviewContextEntry] = Field(default_factory=list)
 
 
 # -- workspace --------------------------------------------------------------

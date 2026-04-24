@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Code2,
+  FlaskConical,
   type LucideIcon,
   MessageSquare,
   Settings,
@@ -22,6 +23,7 @@ interface NavEntry {
 
 const PRIMARY_NAV: NavEntry[] = [
   { href: "/code", label: "Code", icon: Code2, matchPrefix: "/code" },
+  { href: "/drift", label: "Drift", icon: FlaskConical, matchPrefix: "/drift" },
   { href: "/knowledge", label: "Knowledge", icon: BookOpen, matchPrefix: "/knowledge" },
   { href: "/ask", label: "Ask", icon: MessageSquare, matchPrefix: "/ask" },
 ];

@@ -36,6 +36,60 @@ export interface RetrievalResponse {
   used_fallback?: boolean | null;
 }
 
+export type ReviewStatus = "aligned" | "warning" | "conflict" | "unknown";
+
+export interface ReviewLineRange {
+  start: number;
+  end: number;
+}
+
+export interface ReviewFinding {
+  issue_type: string;
+  expected: string;
+  observed: string;
+  comparison: string;
+  severity: string;
+  confidence: string;
+  summary: string;
+}
+
+export interface ReviewEvidenceSource {
+  source_file: string;
+  chunk_type: ChunkType;
+  kind?: string | null;
+  score: number;
+  embed_text: string;
+}
+
+export interface ReviewCheck {
+  label: string;
+  source_file: string;
+  line_range: ReviewLineRange | null;
+  status: ReviewStatus;
+  summary: string;
+  violations: string[];
+  confidence: string;
+  used_fallback: boolean;
+  findings: ReviewFinding[];
+  supporting_sources: ReviewEvidenceSource[];
+}
+
+export interface ReviewContextEntry {
+  label: string;
+  query_text: string;
+  has_conflict: boolean;
+  used_fallback: boolean;
+  sources: ReviewEvidenceSource[];
+}
+
+export interface FileReviewResponse {
+  workspace: string;
+  target: string;
+  drift_status: ReviewStatus;
+  drift: ReviewCheck[];
+  context: ReviewContextEntry[];
+}
+
 export interface WorkspaceStats {
   code_files: number;
   knowledge_files: number;
@@ -201,6 +255,16 @@ export const retrieval = {
     }),
   free: (body: { question: string; k?: number }) =>
     request<RetrievalResponse>("/api/retrieve/free", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+};
+
+// -- review --
+export const review = {
+  // Dedicated file review endpoint used by the GUI drift review surface.
+  file: (body: { path: string }) =>
+    request<FileReviewResponse>("/api/review/file", {
       method: "POST",
       body: JSON.stringify(body),
     }),
