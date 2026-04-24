@@ -11,28 +11,28 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Current Milestone
 
-- Milestone: establish the multi-agent workflow, rollback anchor, and operating docs
-- Goal: make the repo ready for repeated hub-and-spoke implementation cycles
+- Milestone: make the VS Code extension demo-ready
+- Goal: make the extension installable, legible in-demo, and resilient when Synapse is not fully set up
 - Success criteria:
-  - workflow is documented in-repo
-  - role boundaries are explicit
-  - cycle contract format is explicit
-  - verification gate is explicit
-  - a sentinel commit exists as the rollback anchor
+  - extension build and tests pass
+  - side-panel output is readable enough for a live demo
+  - setup and failure states are actionable instead of opaque
+  - README and package metadata are sufficient for install/demo handoff
 
 ## Worker Ownership
 
 - Hub:
   - integration
-  - milestone planning
+  - command/status behavior
   - verification
   - commits and pushes
 - Worker A:
-  - backend foundations unless reassigned for the cycle
+  - `vscode-extension/src/views`
+  - `vscode-extension/src/state`
 - Worker B:
-  - API, frontend, and VS Code extension unless reassigned for the cycle
-- Worker C:
-  - tests, docs, CLI UX, fixtures, and demo flow unless reassigned for the cycle
+  - `vscode-extension/README.md`
+  - `vscode-extension/package.json`
+  - packaging/demo-facing test adjustments if needed
 
 ## Shared Contracts
 
@@ -52,10 +52,10 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Current Cycle Tasks
 
-- Document the operating model for hub-and-spoke execution
-- Document the sentinel commit requirement
-- Update existing agent workflow docs to point at the new process
-- Update milestones to reflect the multi-agent operating mode
+- Improve extension command and status behavior for live demo use
+- Improve side-panel readability and empty states
+- Tighten extension package metadata and demo instructions
+- Re-run extension build and tests before integration
 
 ## Blockers
 
@@ -63,6 +63,9 @@ Update it at the start and end of every multi-agent cycle.
 
 ## Latest Cycle Summary
 
-- Multi-agent operating docs drafted and linked from the existing agent docs
-- Milestones updated to make hub-integrated delivery the default mode
-- This commit is intended to serve as the sentinel rollback anchor for the loop
+- Demo-oriented extension metadata, welcome content, and README guidance landed
+- Side-panel views now present grouped status, review, and query output with clearer empty states
+- Command handling now falls back to the workspace root, auto-refreshes status on context changes, and offers actionable error follow-up
+- Verification:
+  - `npm run build` in `vscode-extension/`
+  - `npm test` in `vscode-extension/`

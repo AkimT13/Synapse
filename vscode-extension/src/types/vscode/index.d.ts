@@ -27,6 +27,12 @@ declare module "vscode" {
     description?: string;
     tooltip?: string;
     contextValue?: string;
+    iconPath?: ThemeIcon;
+  }
+
+  export class ThemeIcon {
+    constructor(id: string);
+    readonly id: string;
   }
 
   export interface TreeDataProvider<T> {
@@ -83,6 +89,7 @@ declare module "vscode" {
 
   export const window: {
     activeTextEditor: TextEditor | undefined;
+    onDidChangeActiveTextEditor(listener: (editor: TextEditor | undefined) => unknown): Disposable;
     createOutputChannel(name: string): OutputChannel;
     createStatusBarItem(alignment?: number, priority?: number): StatusBarItem;
     registerTreeDataProvider<T>(viewId: string, provider: TreeDataProvider<T>): Disposable;
@@ -93,6 +100,7 @@ declare module "vscode" {
 
   export const workspace: {
     workspaceFolders: WorkspaceFolder[] | undefined;
+    onDidChangeWorkspaceFolders(listener: (event: unknown) => unknown): Disposable;
     getWorkspaceFolder(uri: Uri): WorkspaceFolder | undefined;
   };
 

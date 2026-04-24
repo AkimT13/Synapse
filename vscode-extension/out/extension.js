@@ -80,6 +80,15 @@ async function activate(context) {
             statusBarItem.tooltip = message;
         }
     };
+    const refreshVisibleWorkspace = () => {
+        const editorWorkspace = vscode.window.activeTextEditor
+            ? vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri)
+            : undefined;
+        const targetWorkspace = editorWorkspace ?? vscode.workspace.workspaceFolders?.[0];
+        if (targetWorkspace) {
+            void refreshStatus(targetWorkspace.uri.fsPath);
+        }
+    };
     const actionContext = {
         cli,
         store,
@@ -90,11 +99,12 @@ async function activate(context) {
         getWorkspaceFolder: (target) => target ? vscode.workspace.getWorkspaceFolder(target) : vscode.workspace.workspaceFolders?.[0],
         refreshStatus,
     };
-    context.subscriptions.push(output, statusBarItem, vscode.window.registerTreeDataProvider("synapse.statusView", new statusView_1.StatusTreeDataProvider(store)), vscode.window.registerTreeDataProvider("synapse.reviewView", new reviewView_1.ReviewTreeDataProvider(store)), vscode.window.registerTreeDataProvider("synapse.queryView", new queryView_1.QueryTreeDataProvider(store)), vscode.commands.registerCommand("synapse.reviewCurrentFile", (...args) => (0, actions_1.createReviewCurrentFileHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.driftCheckCurrentFile", (...args) => (0, actions_1.createDriftCheckCurrentFileHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.querySelection", (0, actions_1.createQuerySelectionHandler)(actionContext)), vscode.commands.registerCommand("synapse.queryFreeText", (0, actions_1.createQueryFreeTextHandler)(actionContext)), vscode.commands.registerCommand("synapse.ingestWorkspace", (...args) => (0, actions_1.createIngestWorkspaceHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.reindexWorkspace", (0, actions_1.createReindexWorkspaceHandler)(actionContext)), vscode.commands.registerCommand("synapse.openServiceLogs", (0, actions_1.createOpenServiceLogsHandler)(actionContext)), vscode.commands.registerCommand("synapse.doctor", (0, actions_1.createDoctorHandler)(actionContext)));
-    const firstWorkspace = vscode.workspace.workspaceFolders?.[0];
-    if (firstWorkspace) {
-        void refreshStatus(firstWorkspace.uri.fsPath);
-    }
+    context.subscriptions.push(output, statusBarItem, vscode.window.registerTreeDataProvider("synapse.statusView", new statusView_1.StatusTreeDataProvider(store)), vscode.window.registerTreeDataProvider("synapse.reviewView", new reviewView_1.ReviewTreeDataProvider(store)), vscode.window.registerTreeDataProvider("synapse.queryView", new queryView_1.QueryTreeDataProvider(store)), vscode.commands.registerCommand("synapse.reviewCurrentFile", (...args) => (0, actions_1.createReviewCurrentFileHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.driftCheckCurrentFile", (...args) => (0, actions_1.createDriftCheckCurrentFileHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.querySelection", (0, actions_1.createQuerySelectionHandler)(actionContext)), vscode.commands.registerCommand("synapse.queryFreeText", (0, actions_1.createQueryFreeTextHandler)(actionContext)), vscode.commands.registerCommand("synapse.ingestWorkspace", (...args) => (0, actions_1.createIngestWorkspaceHandler)(actionContext)(args[0])), vscode.commands.registerCommand("synapse.reindexWorkspace", (0, actions_1.createReindexWorkspaceHandler)(actionContext)), vscode.commands.registerCommand("synapse.openServiceLogs", (0, actions_1.createOpenServiceLogsHandler)(actionContext)), vscode.commands.registerCommand("synapse.doctor", (0, actions_1.createDoctorHandler)(actionContext)), vscode.window.onDidChangeActiveTextEditor(() => {
+        refreshVisibleWorkspace();
+    }), vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        refreshVisibleWorkspace();
+    }));
+    refreshVisibleWorkspace();
 }
 function deactivate() { }
 //# sourceMappingURL=extension.js.map

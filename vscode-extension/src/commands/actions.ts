@@ -53,6 +53,10 @@ export interface ActionContext {
   refreshStatus(workspaceRoot: string): Promise<void>;
 }
 
+const SYNAPSE_VIEW_COMMAND = "workbench.view.extension.synapse";
+const OPEN_OUTPUT_ACTION = "Open Output";
+const RUN_DOCTOR_ACTION = "Run Doctor";
+
 export function resolveWorkspaceRoot(
   getWorkspaceFolder: (target?: UriLike) => WorkspaceFolderLike | undefined,
   target?: UriLike,
@@ -62,6 +66,13 @@ export function resolveWorkspaceRoot(
 
 export function getAbsoluteFilePath(filePath: string): string {
   return path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+}
+
+function resolveCommandWorkspaceRoot(context: ActionContext): string | undefined {
+  return resolveWorkspaceRoot(
+    context.getWorkspaceFolder,
+    context.getActiveEditor()?.document.uri,
+  ) ?? resolveWorkspaceRoot(context.getWorkspaceFolder);
 }
 
 export function createReviewCurrentFileHandler(context: ActionContext) {
@@ -86,7 +97,7 @@ export function createReviewCurrentFileHandler(context: ActionContext) {
         lastError: undefined,
       });
       await context.refreshStatus(workspaceRoot);
-      await context.commands.executeCommand("workbench.view.extension.synapse");
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
     });
   };
 }
@@ -113,7 +124,7 @@ export function createDriftCheckCurrentFileHandler(context: ActionContext) {
         lastError: undefined,
       });
       await context.refreshStatus(workspaceRoot);
-      await context.commands.executeCommand("workbench.view.extension.synapse");
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
     });
   };
 }
@@ -143,18 +154,14 @@ export function createQuerySelectionHandler(context: ActionContext) {
         lastError: undefined,
       });
       await context.refreshStatus(workspaceRoot);
-      await context.commands.executeCommand("workbench.view.extension.synapse");
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
     });
   };
 }
 
 export function createQueryFreeTextHandler(context: ActionContext) {
   return async (): Promise<void> => {
-    const editor = context.getActiveEditor();
-    const workspaceRoot = resolveWorkspaceRoot(
-      context.getWorkspaceFolder,
-      editor?.document.uri,
-    );
+    const workspaceRoot = resolveCommandWorkspaceRoot(context);
     if (!workspaceRoot) {
       await context.window.showErrorMessage("Open a workspace before running Synapse query.");
       return;
@@ -174,7 +181,7 @@ export function createQueryFreeTextHandler(context: ActionContext) {
         lastError: undefined,
       });
       await context.refreshStatus(workspaceRoot);
-      await context.commands.executeCommand("workbench.view.extension.synapse");
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
     });
   };
 }
@@ -184,7 +191,7 @@ export function createIngestWorkspaceHandler(context: ActionContext) {
     const workspaceRoot = resolveWorkspaceRoot(
       context.getWorkspaceFolder,
       resource ?? context.getActiveEditor()?.document.uri,
-    );
+    ) ?? resolveWorkspaceRoot(context.getWorkspaceFolder);
     if (!workspaceRoot) {
       await context.window.showErrorMessage("Open a workspace before running Synapse ingest.");
       return;
@@ -201,6 +208,7 @@ export function createIngestWorkspaceHandler(context: ActionContext) {
       }
       context.output.show(true);
       await context.refreshStatus(workspaceRoot);
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
       await context.window.showInformationMessage("Synapse ingest completed.");
     });
   };
@@ -208,10 +216,7 @@ export function createIngestWorkspaceHandler(context: ActionContext) {
 
 export function createReindexWorkspaceHandler(context: ActionContext) {
   return async (): Promise<void> => {
-    const workspaceRoot = resolveWorkspaceRoot(
-      context.getWorkspaceFolder,
-      context.getActiveEditor()?.document.uri,
-    );
+    const workspaceRoot = resolveCommandWorkspaceRoot(context);
     if (!workspaceRoot) {
       await context.window.showErrorMessage("Open a workspace before running Synapse reindex.");
       return;
@@ -223,6 +228,7 @@ export function createReindexWorkspaceHandler(context: ActionContext) {
       );
       context.output.show(true);
       await context.refreshStatus(workspaceRoot);
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
       await context.window.showInformationMessage("Synapse reindex completed.");
     });
   };
@@ -230,10 +236,7 @@ export function createReindexWorkspaceHandler(context: ActionContext) {
 
 export function createOpenServiceLogsHandler(context: ActionContext) {
   return async (): Promise<void> => {
-    const workspaceRoot = resolveWorkspaceRoot(
-      context.getWorkspaceFolder,
-      context.getActiveEditor()?.document.uri,
-    );
+    const workspaceRoot = resolveCommandWorkspaceRoot(context);
     if (!workspaceRoot) {
       await context.window.showErrorMessage("Open a workspace before viewing Synapse logs.");
       return;
@@ -242,22 +245,20 @@ export function createOpenServiceLogsHandler(context: ActionContext) {
       const logs = await context.cli.openServiceLogs(workspaceRoot);
       context.output.appendLine(logs || "No service log output.");
       context.output.show(false);
+      await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
     });
   };
 }
 
 export function createDoctorHandler(context: ActionContext) {
   return async (): Promise<void> => {
-    const workspaceRoot = resolveWorkspaceRoot(
-      context.getWorkspaceFolder,
-      context.getActiveEditor()?.document.uri,
-    );
+    const workspaceRoot = resolveCommandWorkspaceRoot(context);
     if (!workspaceRoot) {
       await context.window.showErrorMessage("Open a workspace before running Synapse doctor.");
       return;
     }
     await context.refreshStatus(workspaceRoot);
-    await context.commands.executeCommand("workbench.view.extension.synapse");
+    await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
   };
 }
 
@@ -283,8 +284,22 @@ export async function runWithHandling(
       context.output.appendLine(`Suggestion: ${fix}`);
     }
     context.output.show(true);
-    await context.window.showErrorMessage(detail);
+    const action = await context.window.showErrorMessage(
+      detail,
+      OPEN_OUTPUT_ACTION,
+      ...shouldOfferDoctor(failure) ? [RUN_DOCTOR_ACTION] : [],
+    );
+    if (action === OPEN_OUTPUT_ACTION) {
+      context.output.show(true);
+    }
+    if (action === RUN_DOCTOR_ACTION) {
+      await context.commands.executeCommand("synapse.doctor");
+    }
   }
+}
+
+function shouldOfferDoctor(failure: CliFailure): boolean {
+  return failure.code !== "BINARY_MISSING";
 }
 
 export function renderFailureMessage(failure: CliFailure): string {

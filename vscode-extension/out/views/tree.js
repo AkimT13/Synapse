@@ -36,11 +36,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.BaseTreeDataProvider = exports.SynapseTreeItem = void 0;
 const vscode = __importStar(require("vscode"));
 class SynapseTreeItem extends vscode.TreeItem {
-    constructor(label, { description, tooltip, collapsibleState = vscode.TreeItemCollapsibleState.None, contextValue, } = {}) {
+    children;
+    constructor(label, { description, tooltip, collapsibleState = vscode.TreeItemCollapsibleState.None, contextValue, iconPath, children = [], } = {}) {
         super(label, collapsibleState);
         this.description = description;
         this.tooltip = tooltip;
         this.contextValue = contextValue;
+        this.iconPath = iconPath;
+        this.children = children;
     }
 }
 exports.SynapseTreeItem = SynapseTreeItem;
@@ -52,6 +55,12 @@ class BaseTreeDataProvider {
     }
     getTreeItem(element) {
         return element;
+    }
+    async getChildren(element) {
+        if (element) {
+            return element.children;
+        }
+        return this.getRootChildren();
     }
 }
 exports.BaseTreeDataProvider = BaseTreeDataProvider;

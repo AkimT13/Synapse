@@ -1,6 +1,8 @@
 import * as vscode from "vscode";
 
 export class SynapseTreeItem extends vscode.TreeItem {
+  readonly children: SynapseTreeItem[];
+
   constructor(
     label: string,
     {
@@ -8,17 +10,23 @@ export class SynapseTreeItem extends vscode.TreeItem {
       tooltip,
       collapsibleState = vscode.TreeItemCollapsibleState.None,
       contextValue,
+      iconPath,
+      children = [],
     }: {
       description?: string;
       tooltip?: string;
       collapsibleState?: number;
       contextValue?: string;
+      iconPath?: vscode.ThemeIcon;
+      children?: SynapseTreeItem[];
     } = {},
   ) {
     super(label, collapsibleState);
     this.description = description;
     this.tooltip = tooltip;
     this.contextValue = contextValue;
+    this.iconPath = iconPath;
+    this.children = children;
   }
 }
 
@@ -37,5 +45,12 @@ export abstract class BaseTreeDataProvider
     return element;
   }
 
-  abstract getChildren(element?: SynapseTreeItem): Promise<SynapseTreeItem[]>;
+  async getChildren(element?: SynapseTreeItem): Promise<SynapseTreeItem[]> {
+    if (element) {
+      return element.children;
+    }
+    return this.getRootChildren();
+  }
+
+  protected abstract getRootChildren(): Promise<SynapseTreeItem[]>;
 }

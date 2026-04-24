@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 
 const { SynapseStateStore } = require("../out/state/store.js");
 const {
+  createDoctorHandler,
   createQuerySelectionHandler,
   createReviewCurrentFileHandler,
   getAbsoluteFilePath,
@@ -139,4 +140,16 @@ test("query selection rejects an empty selection", async () => {
   });
   await createQuerySelectionHandler(context)();
   assert.deepEqual(calls.errors, ["Select code before running Synapse query."]);
+});
+
+test("doctor falls back to the workspace when no editor is active", async () => {
+  const { context, calls } = makeContext({
+    getActiveEditor: () => undefined,
+    refreshStatus: async (workspaceRoot) => {
+      calls.refreshed = workspaceRoot;
+    },
+  });
+  await createDoctorHandler(context)();
+  assert.equal(calls.refreshed, "/repo");
+  assert.equal(calls.command, "workbench.view.extension.synapse");
 });

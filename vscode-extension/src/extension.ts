@@ -55,6 +55,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  const refreshVisibleWorkspace = (): void => {
+    const editorWorkspace = vscode.window.activeTextEditor
+      ? vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri)
+      : undefined;
+    const targetWorkspace = editorWorkspace ?? vscode.workspace.workspaceFolders?.[0];
+    if (targetWorkspace) {
+      void refreshStatus(targetWorkspace.uri.fsPath);
+    }
+  };
+
   const actionContext = {
     cli,
     store,
@@ -108,12 +118,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       "synapse.doctor",
       createDoctorHandler(actionContext),
     ),
+    vscode.window.onDidChangeActiveTextEditor(() => {
+      refreshVisibleWorkspace();
+    }),
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      refreshVisibleWorkspace();
+    }),
   );
 
-  const firstWorkspace = vscode.workspace.workspaceFolders?.[0];
-  if (firstWorkspace) {
-    void refreshStatus(firstWorkspace.uri.fsPath);
-  }
+  refreshVisibleWorkspace();
 }
 
 export function deactivate(): void {}

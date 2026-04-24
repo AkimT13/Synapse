@@ -1,15 +1,34 @@
 {
   "name": "synapse-vscode-extension",
   "displayName": "Synapse",
-  "description": "Review-centric VS Code integration for the Synapse CLI.",
+  "description": "Review-centric VS Code integration for Synapse CLI workflows, drift checks, and retrieval queries.",
   "version": "0.1.0",
   "private": true,
   "publisher": "synapse-local",
+  "preview": true,
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AkimT13/Synapse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AkimT13/Synapse/issues"
+  },
+  "homepage": "https://github.com/AkimT13/Synapse/tree/main/vscode-extension",
   "engines": {
     "vscode": "^1.88.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Testing"
+  ],
+  "keywords": [
+    "synapse",
+    "drift-detection",
+    "retrieval",
+    "knowledge",
+    "review",
+    "rag"
   ],
   "main": "./out/extension.js",
   "activationEvents": [
@@ -29,35 +48,51 @@
     "commands": [
       {
         "command": "synapse.reviewCurrentFile",
-        "title": "Synapse: Review Current File"
+        "title": "Synapse: Review Current File",
+        "category": "Synapse",
+        "shortTitle": "Review File"
       },
       {
         "command": "synapse.driftCheckCurrentFile",
-        "title": "Synapse: Drift Check Current File"
+        "title": "Synapse: Drift Check Current File",
+        "category": "Synapse",
+        "shortTitle": "Drift Check"
       },
       {
         "command": "synapse.querySelection",
-        "title": "Synapse: Query Selection"
+        "title": "Synapse: Query Selection",
+        "category": "Synapse",
+        "shortTitle": "Query Selection"
       },
       {
         "command": "synapse.queryFreeText",
-        "title": "Synapse: Query Free Text"
+        "title": "Synapse: Query Free Text",
+        "category": "Synapse",
+        "shortTitle": "Free-Text Query"
       },
       {
         "command": "synapse.ingestWorkspace",
-        "title": "Synapse: Ingest Workspace"
+        "title": "Synapse: Ingest Workspace",
+        "category": "Synapse",
+        "shortTitle": "Ingest Workspace"
       },
       {
         "command": "synapse.reindexWorkspace",
-        "title": "Synapse: Reindex Workspace"
+        "title": "Synapse: Reindex Workspace",
+        "category": "Synapse",
+        "shortTitle": "Reindex Workspace"
       },
       {
         "command": "synapse.openServiceLogs",
-        "title": "Synapse: Open Service Logs"
+        "title": "Synapse: Open Service Logs",
+        "category": "Synapse",
+        "shortTitle": "Service Logs"
       },
       {
         "command": "synapse.doctor",
-        "title": "Synapse: Doctor"
+        "title": "Synapse: Doctor",
+        "category": "Synapse",
+        "shortTitle": "Doctor"
       }
     ],
     "viewsContainers": {
@@ -85,7 +120,67 @@
         }
       ]
     },
+    "viewsWelcome": [
+      {
+        "view": "synapse.statusView",
+        "contents": "Review the current workspace health before a demo. [Run Doctor](command:synapse.doctor) [Ingest Workspace](command:synapse.ingestWorkspace)"
+      },
+      {
+        "view": "synapse.statusView",
+        "contents": "If Synapse services are not running, open logs after `synapse services up`. [Open Service Logs](command:synapse.openServiceLogs)"
+      },
+      {
+        "view": "synapse.reviewView",
+        "contents": "Open a source file and run a review to populate this panel. [Review Current File](command:synapse.reviewCurrentFile) [Drift Check Current File](command:synapse.driftCheckCurrentFile)"
+      },
+      {
+        "view": "synapse.queryView",
+        "contents": "Ask a domain question or query selected code for cited results. [Query Free Text](command:synapse.queryFreeText) [Query Selection](command:synapse.querySelection)"
+      }
+    ],
     "menus": {
+      "view/title": [
+        {
+          "command": "synapse.doctor",
+          "group": "navigation",
+          "when": "view == synapse.statusView"
+        },
+        {
+          "command": "synapse.ingestWorkspace",
+          "group": "navigation",
+          "when": "view == synapse.statusView"
+        },
+        {
+          "command": "synapse.reindexWorkspace",
+          "group": "navigation",
+          "when": "view == synapse.statusView"
+        },
+        {
+          "command": "synapse.openServiceLogs",
+          "group": "navigation",
+          "when": "view == synapse.statusView"
+        },
+        {
+          "command": "synapse.reviewCurrentFile",
+          "group": "navigation",
+          "when": "view == synapse.reviewView"
+        },
+        {
+          "command": "synapse.driftCheckCurrentFile",
+          "group": "navigation",
+          "when": "view == synapse.reviewView"
+        },
+        {
+          "command": "synapse.querySelection",
+          "group": "navigation",
+          "when": "view == synapse.queryView"
+        },
+        {
+          "command": "synapse.queryFreeText",
+          "group": "navigation",
+          "when": "view == synapse.queryView"
+        }
+      ],
       "editor/title": [
         {
           "command": "synapse.reviewCurrentFile",
