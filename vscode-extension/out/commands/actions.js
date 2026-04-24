@@ -51,6 +51,7 @@ function createReviewCurrentFileHandler(context) {
             });
             await context.refreshStatus(workspaceRoot);
             await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
+            context.reviewPanel?.reveal();
         });
     };
 }
@@ -77,6 +78,7 @@ function createDriftCheckCurrentFileHandler(context) {
             });
             await context.refreshStatus(workspaceRoot);
             await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
+            context.reviewPanel?.reveal();
         });
     };
 }

@@ -14,6 +14,7 @@ import {
 import { SynapseStateStore } from "./state/store";
 import { QueryTreeDataProvider } from "./views/queryView";
 import { ReviewTreeDataProvider } from "./views/reviewView";
+import { ReviewWebviewPanel } from "./views/reviewWebview";
 import { StatusTreeDataProvider } from "./views/statusView";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -65,12 +66,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
   };
 
+  const reviewWebview = new ReviewWebviewPanel(store);
+
+  context.subscriptions.push(
+    vscode.window.registerWebviewPanelSerializer(ReviewWebviewPanel.viewType, {
+      async deserializeWebviewPanel(panel: vscode.WebviewPanel) {
+        panel.webview.options = { enableScripts: true };
+        reviewWebview.restorePanel(panel);
+      },
+    }),
+  );
+
   const actionContext = {
     cli,
     store,
     output,
     commands: vscode.commands,
     window: vscode.window,
+    reviewPanel: reviewWebview,
     getActiveEditor: () => vscode.window.activeTextEditor,
     getWorkspaceFolder: (target?: vscode.Uri) =>
       target ? vscode.workspace.getWorkspaceFolder(target) : vscode.workspace.workspaceFolders?.[0],

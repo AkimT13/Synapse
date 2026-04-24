@@ -42,12 +42,17 @@ export interface WorkspaceFolderLike {
   name?: string;
 }
 
+export interface ReviewPanelLike {
+  reveal(): void;
+}
+
 export interface ActionContext {
   cli: SynapseCliRunner;
   store: SynapseStateStore;
   window: WindowLike;
   commands: CommandsLike;
   output: OutputLike;
+  reviewPanel?: ReviewPanelLike;
   getActiveEditor(): TextEditorLike | undefined;
   getWorkspaceFolder(target?: UriLike): WorkspaceFolderLike | undefined;
   refreshStatus(workspaceRoot: string): Promise<void>;
@@ -98,6 +103,7 @@ export function createReviewCurrentFileHandler(context: ActionContext) {
       });
       await context.refreshStatus(workspaceRoot);
       await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
+      context.reviewPanel?.reveal();
     });
   };
 }
@@ -125,6 +131,7 @@ export function createDriftCheckCurrentFileHandler(context: ActionContext) {
       });
       await context.refreshStatus(workspaceRoot);
       await context.commands.executeCommand(SYNAPSE_VIEW_COMMAND);
+      context.reviewPanel?.reveal();
     });
   };
 }

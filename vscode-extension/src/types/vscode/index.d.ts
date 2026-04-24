@@ -47,6 +47,43 @@ declare module "vscode" {
     fsPath: string;
   }
 
+  export const Uri: {
+    file(path: string): Uri;
+  };
+
+  export class Range {
+    constructor(startLine: number, startCharacter: number, endLine: number, endCharacter: number);
+  }
+
+  export const ViewColumn: {
+    Active: number;
+    Beside: number;
+    One: number;
+    Two: number;
+    Three: number;
+  };
+
+  export interface WebviewOptions {
+    enableScripts?: boolean;
+    retainContextWhenHidden?: boolean;
+  }
+
+  export interface Webview {
+    html: string;
+    options: WebviewOptions;
+    onDidReceiveMessage: Event<unknown>;
+  }
+
+  export interface WebviewPanel extends Disposable {
+    readonly webview: Webview;
+    reveal(viewColumn?: number, preserveFocus?: boolean): void;
+    onDidDispose: Event<void>;
+  }
+
+  export interface WebviewPanelSerializer {
+    deserializeWebviewPanel(panel: WebviewPanel, state: unknown): Thenable<void>;
+  }
+
   export interface WorkspaceFolder {
     uri: Uri;
     name: string;
@@ -92,7 +129,15 @@ declare module "vscode" {
     onDidChangeActiveTextEditor(listener: (editor: TextEditor | undefined) => unknown): Disposable;
     createOutputChannel(name: string): OutputChannel;
     createStatusBarItem(alignment?: number, priority?: number): StatusBarItem;
+    createWebviewPanel(
+      viewType: string,
+      title: string,
+      showOptions: { viewColumn: number; preserveFocus?: boolean },
+      options?: WebviewOptions,
+    ): WebviewPanel;
     registerTreeDataProvider<T>(viewId: string, provider: TreeDataProvider<T>): Disposable;
+    registerWebviewPanelSerializer(viewType: string, serializer: WebviewPanelSerializer): Disposable;
+    showTextDocument(uri: Uri, options?: { selection?: Range; preview?: boolean }): Thenable<TextEditor>;
     showErrorMessage(message: string, ...items: string[]): Thenable<string | undefined>;
     showInformationMessage(message: string, ...items: string[]): Thenable<string | undefined>;
     showInputBox(options: { prompt: string; placeHolder?: string }): Thenable<string | undefined>;

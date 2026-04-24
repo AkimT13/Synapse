@@ -41,6 +41,7 @@ const actions_1 = require("./commands/actions");
 const store_1 = require("./state/store");
 const queryView_1 = require("./views/queryView");
 const reviewView_1 = require("./views/reviewView");
+const reviewWebview_1 = require("./views/reviewWebview");
 const statusView_1 = require("./views/statusView");
 async function activate(context) {
     const cli = new cli_1.SynapseCliRunner();
@@ -89,12 +90,20 @@ async function activate(context) {
             void refreshStatus(targetWorkspace.uri.fsPath);
         }
     };
+    const reviewWebview = new reviewWebview_1.ReviewWebviewPanel(store);
+    context.subscriptions.push(vscode.window.registerWebviewPanelSerializer(reviewWebview_1.ReviewWebviewPanel.viewType, {
+        async deserializeWebviewPanel(panel) {
+            panel.webview.options = { enableScripts: true };
+            reviewWebview.restorePanel(panel);
+        },
+    }));
     const actionContext = {
         cli,
         store,
         output,
         commands: vscode.commands,
         window: vscode.window,
+        reviewPanel: reviewWebview,
         getActiveEditor: () => vscode.window.activeTextEditor,
         getWorkspaceFolder: (target) => target ? vscode.workspace.getWorkspaceFolder(target) : vscode.workspace.workspaceFolders?.[0],
         refreshStatus,
