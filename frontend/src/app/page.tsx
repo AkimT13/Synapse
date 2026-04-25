@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, GitBranch, Layers, Network } from "lucide-react";
+import { ArrowRight, Check, Copy, GitBranch, Layers, Network } from "lucide-react";
 
 import { CodeWindow } from "@/components/landing/CodeWindow";
 import { FeatureCard } from "@/components/landing/FeatureCard";
@@ -12,6 +12,51 @@ import { workspace } from "@/lib/api";
 
 /* Landing page — ported from mockups/index.html into React + Tailwind.
    Interactive bits: IntersectionObserver reveal-on-scroll + copy button. */
+
+const INSTALL_CMD = "git clone https://github.com/AkimT13/Synapse.git && cd Synapse && bash install.sh";
+
+function InstallSnippet() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(INSTALL_CMD);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+
+  return (
+    <div className="group relative w-full max-w-2xl overflow-hidden rounded-xl border border-white/[0.08] bg-white/[0.03] transition-colors hover:border-white/[0.14]">
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="select-none font-mono text-sm text-violet">$</span>
+        <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-[13px] leading-relaxed text-neutral-300">
+          {INSTALL_CMD}
+        </code>
+        <button
+          type="button"
+          onClick={handleCopy}
+          aria-label="Copy install command"
+          className="ml-2 flex flex-shrink-0 items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.04] px-2.5 py-1.5 font-mono text-[11px] text-neutral-400 transition-all hover:border-white/[0.16] hover:bg-white/[0.08] hover:text-white"
+        >
+          {copied ? (
+            <>
+              <Check size={12} className="text-emerald-fg" />
+              <span className="text-emerald-fg">copied</span>
+            </>
+          ) : (
+            <>
+              <Copy size={12} />
+              copy
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   // If the backend already has corpora on disk, the nav pill's primary
@@ -234,6 +279,14 @@ export default function Home() {
                 →
               </span>
             </a>
+          </div>
+
+          {/* Install CTA */}
+          <div
+            className="mt-10 flex animate-rise justify-center"
+            style={{ animationDelay: "0.95s" }}
+          >
+            <InstallSnippet />
           </div>
         </div>
       </header>
