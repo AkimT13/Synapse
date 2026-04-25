@@ -337,9 +337,13 @@ def run_interactive_menu(repo_root: str = ".") -> int:
     menu_out.print("  [cyan][3][/cyan] Ingest workspace")
     menu_out.print("  [cyan][4][/cyan] Run doctor")
     menu_out.print("  [cyan][5][/cyan] Query free text")
+    menu_out.print("  [cyan][6][/cyan] Install agent skills (Claude Code / Codex)")
+    menu_out.print("  [cyan][7][/cyan] Install VS Code extension")
+    menu_out.print("  [cyan][8][/cyan] Launch GUI")
     menu_out.print()
 
-    choice = IntPrompt.ask("Choose", choices=["1", "2", "3", "4", "5"], console=menu_out)
+    choices = [str(i) for i in range(1, 9)]
+    choice = IntPrompt.ask("Choose", choices=choices, console=menu_out)
 
     if choice == 1:
         file_path = Prompt.ask("File path", console=menu_out)
@@ -401,5 +405,33 @@ def run_interactive_menu(repo_root: str = ".") -> int:
             return exit_code
         render_query(json.loads(json_output))
         return exit_code
+
+    if choice == 6:
+        from synapse_cli.install_skill_command import run_install_skill
+        menu_out.print()
+        menu_out.print("  [cyan][1][/cyan] Claude Code only")
+        menu_out.print("  [cyan][2][/cyan] Codex only")
+        menu_out.print("  [cyan][3][/cyan] Both")
+        menu_out.print()
+        agent_choice = IntPrompt.ask("Choose", choices=["1", "2", "3"], console=menu_out)
+        agent_map = {1: "claude", 2: "codex", 3: "both"}
+        exit_code, output = run_install_skill(
+            start_path=repo_root,
+            agent=agent_map[agent_choice],
+            force=True,
+        )
+        if exit_code != 0:
+            console.print(f"[red]{output}[/red]")
+        else:
+            menu_out.print(f"\n{output}")
+        return exit_code
+
+    if choice == 7:
+        from synapse_cli.vscode_command import run_vscode_install
+        return run_vscode_install()
+
+    if choice == 8:
+        from synapse_cli.ui_command import run_ui
+        return run_ui()
 
     return 0

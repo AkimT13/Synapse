@@ -12,11 +12,13 @@ from __future__ import annotations
 from fnmatch import fnmatch
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
 
+from api.dependencies import get_workspace_config
 from api.schemas import TreeNode
 from api.settings import CODE_UPLOADS_DIR, KNOWLEDGE_UPLOADS_DIR
+from workspace.loader import LoadedWorkspaceConfig
 
 
 router = APIRouter()
@@ -106,17 +108,39 @@ def _resolve_within_root(root: Path, relative_path: str) -> Path:
     return candidate
 
 
+def _effective_root(
+    ws: LoadedWorkspaceConfig | None,
+    kind: str,
+    fallback: Path,
+) -> Path:
+    """Return the first configured root for *kind* if it has files,
+    otherwise fall back to the upload directory."""
+    if ws:
+        roots = ws.code_roots if kind == "code" else ws.knowledge_roots
+        for root in roots:
+            if root.path.is_dir() and any(root.path.iterdir()):
+                return root.path
+    return fallback
+
+
 # -- code corpus -----------------------------------------------------------
 
 
 @router.get("/code/tree", response_model=TreeNode)
-def get_code_tree() -> TreeNode:
-    return _build_tree(CODE_UPLOADS_DIR)
+def get_code_tree(
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
+) -> TreeNode:
+    return _build_tree(_effective_root(ws, "code", CODE_UPLOADS_DIR))
 
 
 @router.get("/code/files/{path:path}")
-def get_code_file(path: str) -> FileResponse:
-    resolved = _resolve_within_root(CODE_UPLOADS_DIR, path)
+def get_code_file(
+    path: str,
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
+) -> FileResponse:
+    resolved = _resolve_within_root(
+        _effective_root(ws, "code", CODE_UPLOADS_DIR), path,
+    )
     return FileResponse(resolved)
 
 
@@ -124,11 +148,18 @@ def get_code_file(path: str) -> FileResponse:
 
 
 @router.get("/knowledge/tree", response_model=TreeNode)
-def get_knowledge_tree() -> TreeNode:
-    return _build_tree(KNOWLEDGE_UPLOADS_DIR)
+def get_knowledge_tree(
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
+) -> TreeNode:
+    return _build_tree(_effective_root(ws, "knowledge", KNOWLEDGE_UPLOADS_DIR))
 
 
 @router.get("/knowledge/files/{path:path}")
-def get_knowledge_file(path: str) -> FileResponse:
-    resolved = _resolve_within_root(KNOWLEDGE_UPLOADS_DIR, path)
+def get_knowledge_file(
+    path: str,
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
+) -> FileResponse:
+    resolved = _resolve_within_root(
+        _effective_root(ws, "knowledge", KNOWLEDGE_UPLOADS_DIR), path,
+    )
     return FileResponse(resolved)

@@ -1743,6 +1743,32 @@ hr.hair { border: 0; border-top: 1px solid var(--line); margin: 0; }
   background: rgba(255, 255, 255, 0.12);
 }
 
+/* ----- sources management (onboarding return view) ----- */
+.sources-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  height: calc(100vh - 80px);
+  min-height: 0;
+}
+.sources-pane-stats {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.3);
+  font-family: var(--font-mono), monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #737373;
+}
+.sources-pane-stats strong {
+  color: #fff;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;

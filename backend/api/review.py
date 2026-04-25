@@ -12,8 +12,8 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 
-from api.corpora import _resolve_within_root
-from api.dependencies import get_vector_store
+from api.corpora import _effective_root, _resolve_within_root
+from api.dependencies import get_vector_store, get_workspace_config
 from api.schemas import (
     ReviewCheck,
     ReviewContextEntry,
@@ -27,7 +27,7 @@ from api.settings import CODE_UPLOADS_DIR, UPLOADS_ROOT, ensure_directories
 from storage.vector_store import VectorStore
 from synapse_cli.drift_check_command import _build_file_checks, _run_single_check
 from synapse_cli.review_command import _aggregate_status, _build_context_entry
-from workspace.loader import load_workspace_config
+from workspace.loader import LoadedWorkspaceConfig, load_workspace_config
 
 router = APIRouter()
 
@@ -171,9 +171,11 @@ def _review_path(
 def review_code_file(
     payload: ReviewRequest,
     store: VectorStore,
+    ws: LoadedWorkspaceConfig | None = None,
 ) -> ReviewResponse:
     _validate_python_target(payload.path)
-    resolved = _resolve_within_root(CODE_UPLOADS_DIR, payload.path)
+    code_root = _effective_root(ws, "code", CODE_UPLOADS_DIR)
+    resolved = _resolve_within_root(code_root, payload.path)
     return _review_path(
         resolved=resolved,
         target=payload.path,
@@ -186,8 +188,9 @@ def review_code_file(
 def review_file(
     payload: ReviewRequest,
     store: VectorStore = Depends(get_vector_store),
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
 ) -> ReviewResponse:
-    return review_code_file(payload, store)
+    return review_code_file(payload, store, ws)
 
 
 @router.post("/upload", response_model=ReviewResponse)

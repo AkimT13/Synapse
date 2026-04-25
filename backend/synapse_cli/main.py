@@ -322,6 +322,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit machine-readable JSON",
     )
 
+    subparsers.add_parser(
+        "vscode",
+        help="Build and install the Synapse VS Code extension",
+    )
+
+    ui_parser = subparsers.add_parser(
+        "ui",
+        help="Start the backend API and frontend dev server together",
+    )
+    ui_parser.add_argument(
+        "--port",
+        type=int,
+        default=8000,
+        help="Backend API port (default: 8000)",
+    )
+    ui_parser.add_argument(
+        "--frontend-port",
+        type=int,
+        default=3000,
+        help="Frontend dev server port (default: 3000)",
+    )
+    ui_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="Don't open the browser automatically",
+    )
+
     return parser
 
 
@@ -329,6 +356,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
+    if args.command == "vscode":
+        return _handle_vscode()
+    if args.command == "ui":
+        return _handle_ui(args)
     if args.command == "init":
         return _handle_init(args)
     if args.command == "status":
@@ -359,15 +390,30 @@ def main(argv: list[str] | None = None) -> int:
     return run_interactive_menu(args.repo_root if hasattr(args, "repo_root") else ".")
 
 
+def _handle_vscode() -> int:
+    from synapse_cli.vscode_command import run_vscode_install
+    return run_vscode_install()
+
+
+def _handle_ui(args: argparse.Namespace) -> int:
+    from synapse_cli.ui_command import run_ui
+    return run_ui(
+        port=args.port,
+        frontend_port=args.frontend_port,
+        no_open=args.no_open,
+    )
+
+
 def _handle_init(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
 
+    # Non-interactive: all options passed via flags.
     if args.code or args.knowledge or args.domain or args.name:
         options = InitOptions(
             repo_root=repo_root,
             workspace_name=args.name or repo_root.name,
-            code_paths=args.code or ["backend", "frontend"],
-            knowledge_paths=args.knowledge or ["sample/knowledge"],
+            code_paths=args.code or ["src"],
+            knowledge_paths=args.knowledge or ["docs"],
             domains=args.domain or ["domain-aware-development"],
             force=args.force,
             chat_provider=args.chat_provider,
@@ -375,6 +421,7 @@ def _handle_init(args: argparse.Namespace) -> int:
             embedding_provider=args.embedding_provider,
             embedding_model=args.embedding_model,
         )
+        interactive = False
     else:
         options = prompt_for_init_options(
             repo_root=repo_root,
@@ -385,14 +432,19 @@ def _handle_init(args: argparse.Namespace) -> int:
             embedding_model=args.embedding_model,
             force=args.force,
         )
+        interactive = True
 
     try:
-        path = run_init(options)
+        path = run_init(options, interactive=interactive)
     except FileExistsError as exc:
         print(str(exc), file=sys.stderr)
         return 2
 
-    print(f"Created {path}")
+    print(f"\nCreated {path}")
+    print("\nNext steps:")
+    print("  synapse services up    # start the vector DB")
+    print("  synapse ingest         # index your code + knowledge")
+    print("  synapse status         # verify everything")
     return 0
 
 

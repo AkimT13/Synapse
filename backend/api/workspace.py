@@ -14,10 +14,11 @@ from fastapi import APIRouter, Depends
 
 import models
 from api.chat_store import ChatStore
-from api.dependencies import get_chat_store, get_vector_store
+from api.dependencies import get_chat_store, get_vector_store, get_workspace_config
 from api.schemas import WorkspaceStats
 from api.settings import CODE_UPLOADS_DIR, KNOWLEDGE_UPLOADS_DIR
 from storage.vector_store import VectorStore
+from workspace.loader import LoadedWorkspaceConfig
 
 
 router = APIRouter()
@@ -57,6 +58,7 @@ def _count_files(root: Path) -> int:
 @router.get("/stats", response_model=WorkspaceStats)
 def get_stats(
     store: VectorStore = Depends(get_vector_store),
+    ws: LoadedWorkspaceConfig | None = Depends(get_workspace_config),
 ) -> WorkspaceStats:
     # Counts come straight from the vector DB so they persist across
     # sessions; a freshly started backend with on-disk uploads still
@@ -72,9 +74,24 @@ def get_stats(
         total_code = None
         total_knowledge = None
 
+    # Prefer configured source roots from .synapse/config.yaml when
+    # available; fall back to the upload directories for the legacy
+    # browser-upload flow.
+    code_files = 0
+    knowledge_files = 0
+    if ws:
+        for root in ws.code_roots:
+            code_files += _count_files(root.path)
+        for root in ws.knowledge_roots:
+            knowledge_files += _count_files(root.path)
+    if code_files == 0:
+        code_files = _count_files(CODE_UPLOADS_DIR)
+    if knowledge_files == 0:
+        knowledge_files = _count_files(KNOWLEDGE_UPLOADS_DIR)
+
     return WorkspaceStats(
-        code_files=_count_files(CODE_UPLOADS_DIR),
-        knowledge_files=_count_files(KNOWLEDGE_UPLOADS_DIR),
+        code_files=code_files,
+        knowledge_files=knowledge_files,
         total_code_chunks=total_code,
         total_knowledge_chunks=total_knowledge,
     )

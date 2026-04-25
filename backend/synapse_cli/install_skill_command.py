@@ -28,13 +28,20 @@ def run_install_skill(
         existing_paths = ", ".join(str(target["skill_path"]) for target in existing)
         return 4, f"Skill already exists. Pass --force to overwrite: {existing_paths}"
 
+    # Derive paths from the workspace config so the skill works in any repo.
+    code_dirs = [root.path for root in workspace.config.sources.code_roots]
+    knowledge_dirs = [root.path for root in workspace.config.sources.knowledge_roots]
+
     overwritten_paths = {target["skill_path"] for target in existing}
     installed: list[dict[str, object]] = []
     for target in targets:
         skill_dir = target["skill_dir"]
         skill_path = target["skill_path"]
         skill_dir.mkdir(parents=True, exist_ok=True)
-        skill_path.write_text(_render_skill_markdown(), encoding="utf-8")
+        skill_path.write_text(
+            _render_skill_markdown(code_dirs=code_dirs, knowledge_dirs=knowledge_dirs),
+            encoding="utf-8",
+        )
         installed.append(
             {
                 "agent": target["agent"],
@@ -81,10 +88,17 @@ def _resolve_targets(repo_root: Path, agent: str) -> list[dict[str, object]]:
     return targets
 
 
-def _render_skill_markdown() -> str:
-    return """---
+def _render_skill_markdown(
+    *,
+    code_dirs: list[str],
+    knowledge_dirs: list[str],
+) -> str:
+    code_list = ", ".join(f"`{d}`" for d in code_dirs) or "`src`"
+    knowledge_list = ", ".join(f"`{d}`" for d in knowledge_dirs) or "`docs`"
+
+    return f"""---
 name: synapse-review
-description: Use when editing domain-relevant code in this repository, especially under sample/code. Before editing, run Synapse review on the target file. After editing, run Synapse review again and use the findings to verify alignment with sample/knowledge.
+description: Use when editing domain-relevant code in this repository, especially under {code_list}. Before editing, run Synapse review on the target file. After editing, run Synapse review again and use the findings to verify alignment with {knowledge_list}.
 ---
 
 # Synapse Review
@@ -92,9 +106,9 @@ description: Use when editing domain-relevant code in this repository, especiall
 Use this skill for domain-sensitive code changes in this repository.
 
 Current workspace defaults:
-- edit target files under `sample/code`
-- treat `sample/knowledge` as the domain reference corpus
-- avoid modifying `backend/`, `frontend/`, or `.synapse/` unless the task explicitly requires it
+- edit target files under {code_list}
+- treat {knowledge_list} as the domain reference corpus
+- avoid modifying `.synapse/` unless the task explicitly requires it
 
 ## Required workflow
 
@@ -130,7 +144,7 @@ Include:
 - key Synapse findings after the edit
 - final drift status for the file
 
-Keep changes scoped to `sample/code` unless the user explicitly asks for broader repository changes.
+Keep changes scoped to {code_list} unless the user explicitly asks for broader repository changes.
 """
 
 

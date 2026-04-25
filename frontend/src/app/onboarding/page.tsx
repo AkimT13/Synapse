@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Check, Loader2, RotateCcw } from "lucide-react";
 import {
+  corpora,
   ingestCode,
   ingestJobStreamUrl,
   ingestKnowledge,
@@ -11,6 +13,7 @@ import {
 } from "@/lib/api";
 import { useChat } from "@/lib/stores";
 import { UploadCard } from "@/components/onboarding/UploadCard";
+import { SourcesManagement } from "@/components/onboarding/SourcesManagement";
 import type { IngestionDoneResult, JobState } from "@/components/onboarding/types";
 
 type Variant = "code" | "knowledge";
@@ -22,6 +25,12 @@ export default function OnboardingPage() {
   });
   const [codeSource, setCodeSource] = useState(0);
   const [knowledgeSource, setKnowledgeSource] = useState(0);
+  const [managementMode, setManagementMode] = useState(false);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const queryClient = useQueryClient();
+  const codeReplaceRef = useRef<HTMLInputElement | null>(null);
+  const knowledgeReplaceRef = useRef<HTMLInputElement | null>(null);
 
   // Hold live EventSource refs so we can clean them up on unmount or restart.
   const codeEsRef = useRef<EventSource | null>(null);
@@ -73,6 +82,9 @@ export default function OnboardingPage() {
       })
       .catch(() => {
         // Backend may be down; leave both sides in idle.
+      })
+      .finally(() => {
+        if (!cancelled) setStatsLoading(false);
       });
     return () => {
       cancelled = true;
@@ -195,6 +207,69 @@ export default function OnboardingPage() {
     knowledgeState.kind === "already-uploaded";
   const bothDone = codeReady && knowledgeReady;
 
+  // Latch into management mode once both sides are ready. The flag is
+  // sticky so the layout doesn't flip back during a re-ingest.
+  useEffect(() => {
+    if (bothDone && !managementMode) setManagementMode(true);
+  }, [bothDone, managementMode]);
+
+  // Tree queries — only fetched while in management mode.
+  const codeTreeQuery = useQuery({
+    queryKey: ["code-tree"],
+    queryFn: () => corpora.codeTree(),
+    enabled: managementMode && codeReady,
+  });
+  const knowledgeTreeQuery = useQuery({
+    queryKey: ["knowledge-tree"],
+    queryFn: () => corpora.knowledgeTree(),
+    enabled: managementMode && knowledgeReady,
+  });
+
+  // Derived stats for the management view.
+  const managementStats = useMemo(() => {
+    const codeFiles =
+      codeState.kind === "done"
+        ? codeState.result.files_processed
+        : codeState.kind === "already-uploaded"
+          ? codeState.fileCount
+          : 0;
+    const codeChunks =
+      codeState.kind === "done"
+        ? codeState.result.chunks_stored
+        : codeState.kind === "already-uploaded"
+          ? codeState.chunkCount
+          : null;
+    const knowledgeFiles =
+      knowledgeState.kind === "done"
+        ? knowledgeState.result.files_processed
+        : knowledgeState.kind === "already-uploaded"
+          ? knowledgeState.fileCount
+          : 0;
+    const knowledgeChunks =
+      knowledgeState.kind === "done"
+        ? knowledgeState.result.chunks_stored
+        : knowledgeState.kind === "already-uploaded"
+          ? knowledgeState.chunkCount
+          : null;
+    return { codeFiles, codeChunks, knowledgeFiles, knowledgeChunks };
+  }, [codeState, knowledgeState]);
+
+  // Invalidate tree caches after a re-ingest completes.
+  const prevCodeKind = useRef(codeState.kind);
+  const prevKnowledgeKind = useRef(knowledgeState.kind);
+  useEffect(() => {
+    if (prevCodeKind.current !== "done" && codeState.kind === "done") {
+      queryClient.invalidateQueries({ queryKey: ["code-tree"] });
+    }
+    prevCodeKind.current = codeState.kind;
+  }, [codeState.kind, queryClient]);
+  useEffect(() => {
+    if (prevKnowledgeKind.current !== "done" && knowledgeState.kind === "done") {
+      queryClient.invalidateQueries({ queryKey: ["knowledge-tree"] });
+    }
+    prevKnowledgeKind.current = knowledgeState.kind;
+  }, [knowledgeState.kind, queryClient]);
+
   // --- workspace reset ----------------------------------------------------
   // Nukes both upload corpora on disk, drops the vector collection, and
   // clears chat history on the backend. Mirrors the state locally: close
@@ -220,6 +295,7 @@ export default function OnboardingPage() {
 
       setCodeState({ kind: "idle" });
       setKnowledgeState({ kind: "idle" });
+      setManagementMode(false);
       setActiveChat(null);
     } catch (err) {
       window.alert(
@@ -246,51 +322,149 @@ export default function OnboardingPage() {
     return c + k;
   }, [codeState, knowledgeState]);
 
+  // --- loading guard -------------------------------------------------------
+  // While the initial stats() call resolves we don't yet know whether to
+  // show the hero or the management view. Show a brief loading state to
+  // prevent layout flicker.
+  if (statsLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-[#525252]">
+        <Loader2 size={20} className="animate-spin" />
+      </div>
+    );
+  }
+
+  // --- shared topbar -------------------------------------------------------
+  const topbar = (
+    <header
+      className="topbar"
+      style={{
+        borderBottom: "1px solid var(--line)",
+        minHeight: 80,
+        paddingTop: 16,
+        paddingBottom: 16,
+      }}
+    >
+      <Link className="brand" href="/">
+        <span className="brand-dot" />
+        <span className="brand-word">Synapse</span>
+      </Link>
+
+      <StepRail activeStep={bothDone ? 3 : 2} />
+
+      <div className="flex items-center gap-3.5">
+        <button
+          type="button"
+          onClick={handleReset}
+          disabled={isResetting}
+          aria-label="Reset workspace"
+          className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#a3a3a3] transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isResetting ? (
+            <Loader2 size={12} className="animate-spin" />
+          ) : (
+            <RotateCcw size={12} />
+          )}
+          {isResetting ? "Resetting…" : "Reset"}
+        </button>
+        <span className="status-pill">
+          <span className="status-dot" />
+          Live session
+        </span>
+        <span className="avatar">SY</span>
+      </div>
+    </header>
+  );
+
+  // --- hidden file inputs for management view replace flow -----------------
+  const hiddenInputs = (
+    <>
+      <input
+        ref={codeReplaceRef}
+        type="file"
+        // @ts-expect-error webkitdirectory isn't in the React HTMLInputElement typing
+        webkitdirectory=""
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) handleCodeFiles(Array.from(e.target.files));
+          e.target.value = "";
+        }}
+      />
+      <input
+        ref={knowledgeReplaceRef}
+        type="file"
+        multiple
+        accept=".pdf,.docx,.md,.txt,.html"
+        className="hidden"
+        onChange={(e) => {
+          if (e.target.files) handleKnowledgeFiles(Array.from(e.target.files));
+          e.target.value = "";
+        }}
+      />
+    </>
+  );
+
+  // --- management view (return visit with data) ----------------------------
+  if (managementMode) {
+    return (
+      <>
+        {topbar}
+        {hiddenInputs}
+        <SourcesManagement
+          codeTree={codeTreeQuery.data ?? null}
+          codeTreeLoading={codeTreeQuery.isLoading}
+          knowledgeTree={knowledgeTreeQuery.data ?? null}
+          knowledgeTreeLoading={knowledgeTreeQuery.isLoading}
+          stats={managementStats}
+          onReplaceCode={() => codeReplaceRef.current?.click()}
+          onReplaceKnowledge={() => knowledgeReplaceRef.current?.click()}
+          codeState={codeState}
+          knowledgeState={knowledgeState}
+        />
+        {/* Footer bar */}
+        <div
+          className="flex items-center justify-between border-t border-line px-6 py-3"
+          style={{ background: "rgba(0,0,0,0.3)" }}
+        >
+          <div className="flex items-center gap-3.5 text-sm text-[#a3a3a3]">
+            <span
+              className="inline-flex h-[22px] w-[22px] items-center justify-center rounded-full"
+              style={{
+                background: "rgba(16,185,129,0.15)",
+                color: "#6ee7b7",
+              }}
+            >
+              <Check size={12} strokeWidth={3} />
+            </span>
+            <span>
+              <span className="text-white">
+                {totalChunks.toLocaleString()}
+              </span>{" "}
+              chunks embedded across one collection ·{" "}
+              <span className="text-white">ready</span>
+            </span>
+          </div>
+          <Link
+            href="/code"
+            className="shiny-border"
+            aria-label="Open workspace"
+          >
+            <span className="shiny-inner">
+              Open workspace
+              <ArrowRight size={14} strokeWidth={2} />
+            </span>
+          </Link>
+        </div>
+      </>
+    );
+  }
+
+  // --- first-run view (empty workspace) ------------------------------------
   return (
     <>
-      {/* ===== Top bar ===== */}
-      <header
-        className="topbar"
-        style={{
-          borderBottom: "1px solid var(--line)",
-          minHeight: 80,
-          paddingTop: 16,
-          paddingBottom: 16,
-        }}
-      >
-        <Link className="brand" href="/">
-          <span className="brand-dot" />
-          <span className="brand-word">Synapse</span>
-        </Link>
+      {topbar}
 
-        <StepRail
-          activeStep={bothDone ? 3 : 2}
-        />
-
-        <div className="flex items-center gap-3.5">
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={isResetting}
-            aria-label="Reset workspace"
-            className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[11px] uppercase tracking-[0.18em] text-[#a3a3a3] transition-colors hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isResetting ? (
-              <Loader2 size={12} className="animate-spin" />
-            ) : (
-              <RotateCcw size={12} />
-            )}
-            {isResetting ? "Resetting…" : "Reset"}
-          </button>
-          <span className="status-pill">
-            <span className="status-dot" />
-            Live session
-          </span>
-          <span className="avatar">SY</span>
-        </div>
-      </header>
-
-      {/* ===== Page ===== */}
       <main className="relative overflow-hidden px-7 pt-[72px] pb-[120px]" style={{ minHeight: "calc(100vh - 80px)" }}>
         <div
           aria-hidden

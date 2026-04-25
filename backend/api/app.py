@@ -36,8 +36,10 @@ async def lifespan(app: FastAPI):
         workspace = load_workspace_config(Path(__file__))
     except FileNotFoundError:
         models.init()
+        app.state.workspace_config = None
     else:
         init_models_from_workspace(workspace)
+        app.state.workspace_config = workspace
 
     store = VectorStore()
     store.connect()
