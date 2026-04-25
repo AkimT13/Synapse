@@ -1,11 +1,13 @@
 """
-``synapse vscode`` — build and install the Synapse VS Code extension.
+``synapse vscode`` — build and launch VS Code with the Synapse extension.
 
-Compiles the TypeScript source, packages it as a .vsix, and installs
-it into VS Code via ``code --install-extension``.
+Compiles the TypeScript source and opens a new VS Code window in
+Extension Development Host mode, so the extension loads from source
+with ``synapse`` available on PATH from the current shell.
 """
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -38,6 +40,11 @@ def _find_extension_dir() -> Path:
     )
 
 
+def _find_repo_root(ext_dir: Path) -> Path:
+    """Return the repo root (parent of vscode-extension/)."""
+    return ext_dir.parent
+
+
 def _run(cmd: list[str], cwd: Path, label: str) -> bool:
     """Run a command, print output on failure, return success."""
     print(f"  {CYAN}{label}{RESET}")
@@ -59,6 +66,7 @@ def _run(cmd: list[str], cwd: Path, label: str) -> bool:
 
 def run_vscode_install() -> int:
     ext_dir = _find_extension_dir()
+    repo_root = _find_repo_root(ext_dir)
 
     # Check prerequisites.
     if not shutil.which("code"):
@@ -73,7 +81,7 @@ def run_vscode_install() -> int:
         print(f"{RED}npx not found. Install Node.js first.{RESET}", file=sys.stderr)
         return 2
 
-    print(f"{BOLD}Installing Synapse VS Code extension…{RESET}\n")
+    print(f"{BOLD}Launching Synapse VS Code extension…{RESET}\n")
 
     # 1. npm install
     if not _run(["npm", "install", "--silent"], ext_dir, "Installing dependencies…"):
@@ -83,30 +91,14 @@ def run_vscode_install() -> int:
     if not _run(["npm", "run", "build"], ext_dir, "Compiling TypeScript…"):
         return 1
 
-    # 3. Package as .vsix
-    if not _run(
-        ["npx", "@vscode/vsce", "package", "--no-dependencies", "-o", "synapse.vsix"],
-        ext_dir,
-        "Packaging extension…",
-    ):
-        return 1
+    # 3. Launch VS Code in Extension Development Host mode.
+    # This opens a new window with the extension loaded from source,
+    # inheriting the current PATH so `synapse` is found from the venv.
+    print(f"  {CYAN}Opening VS Code…{RESET}")
+    subprocess.Popen(
+        ["code", f"--extensionDevelopmentPath={ext_dir}", str(repo_root)],
+        env=os.environ,
+    )
 
-    vsix_path = ext_dir / "synapse.vsix"
-    if not vsix_path.is_file():
-        print(f"  {RED}Expected {vsix_path} but it wasn't created.{RESET}")
-        return 1
-
-    # 4. Install into VS Code
-    if not _run(
-        ["code", "--install-extension", str(vsix_path), "--force"],
-        ext_dir,
-        "Installing into VS Code…",
-    ):
-        return 1
-
-    # Clean up the .vsix
-    vsix_path.unlink(missing_ok=True)
-
-    print(f"\n{GREEN}✓ Synapse extension installed.{RESET}")
-    print(f"  Reload VS Code to activate (Cmd+Shift+P → 'Developer: Reload Window').")
+    print(f"\n{GREEN}✓ VS Code opened with Synapse extension loaded.{RESET}")
     return 0
