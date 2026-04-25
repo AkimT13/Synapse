@@ -114,6 +114,9 @@ def _init_repo(tmp_path: Path, name: str) -> Path:
 
 
 class _DummyVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _DummyVectorStore:
         return self
 

@@ -249,6 +249,9 @@ def test_detect_conflict_signal_accepts_llama_style_mismatch_language() -> None:
 
 
 class _DummyVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _DummyVectorStore:
         return self
 

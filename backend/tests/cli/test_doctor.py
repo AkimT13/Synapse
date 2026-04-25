@@ -76,6 +76,9 @@ class _HealthyClient:
 
 
 class _HealthyVectorStore:
+    def __init__(self, **kwargs):
+        self.collection = kwargs.get("collection", "chunks")
+
     def __enter__(self) -> _HealthyVectorStore:
         self.client = _HealthyClient()
         return self

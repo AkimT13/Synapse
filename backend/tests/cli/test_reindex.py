@@ -24,7 +24,7 @@ def test_cli_reindex_runs_reset_then_ingest(
             _json.dumps({
                 "workspace": "reindex-demo",
                 "target": "all",
-                "reset": {"workspace": "reindex-demo", "collection": "chunks", "deleted": True},
+                "reset": {"workspace": "reindex-demo", "collection": "reindex_demo_chunks", "deleted": True},
                 "ingest": {"workspace": "reindex-demo", "target": "all", "summaries": [], "progress": []},
             }),
         ),
@@ -53,7 +53,7 @@ def test_cli_reindex_json_outputs_machine_readable_payload(
                 {
                     "workspace": "reindex-demo",
                     "target": "code",
-                    "reset": {"workspace": "reindex-demo", "collection": "chunks", "deleted": True},
+                    "reset": {"workspace": "reindex-demo", "collection": "reindex_demo_chunks", "deleted": True},
                     "ingest": {"workspace": "reindex-demo", "target": "code", "summaries": [], "progress": []},
                 }
             ),

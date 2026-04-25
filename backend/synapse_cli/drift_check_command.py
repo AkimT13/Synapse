@@ -40,7 +40,7 @@ def run_drift_check(
         return 1, str(exc)
 
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             results = [
                 _run_single_check(check=check, store=store, k=k)
                 for check in checks

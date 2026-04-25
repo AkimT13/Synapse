@@ -21,14 +21,15 @@ def run_reset(
         return 3, "Actian VectorAI client is not installed."
 
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             deleted = store.reset()
     except Exception as exc:  # noqa: BLE001
         return 3, str(exc)
 
+    collection = workspace.collection_name
     payload = {
         "workspace": workspace.config.workspace.name,
-        "collection": "chunks",
+        "collection": collection,
         "deleted": deleted,
     }
 
@@ -36,5 +37,5 @@ def run_reset(
         return 0, json.dumps(payload, indent=2, sort_keys=True)
 
     if deleted:
-        return 0, f"Reset collection 'chunks' for workspace {workspace.config.workspace.name}."
-    return 0, f"Collection 'chunks' did not exist for workspace {workspace.config.workspace.name}."
+        return 0, f"Reset collection '{collection}' for workspace {workspace.config.workspace.name}."
+    return 0, f"Collection '{collection}' did not exist for workspace {workspace.config.workspace.name}."

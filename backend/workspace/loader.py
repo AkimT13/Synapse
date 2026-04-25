@@ -4,6 +4,7 @@ Helpers for discovering and loading ``.synapse/config.yaml`` workspaces.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -60,6 +61,10 @@ class LoadedWorkspaceConfig:
         ]
 
     @property
+    def collection_name(self) -> str:
+        return f"{_slugify_workspace_name(self.config.workspace.name)}_chunks"
+
+    @property
     def chat_model(self) -> ResolvedModelConfig:
         return _resolve_model_config(
             self.config.models.chat,
@@ -74,6 +79,12 @@ class LoadedWorkspaceConfig:
             self.config.runtime.ollama.base_url,
             self.config.runtime.ollama.base_url_env,
         )
+
+
+def _slugify_workspace_name(name: str) -> str:
+    slug = re.sub(r"[^a-z0-9]", "_", name.lower())
+    slug = re.sub(r"_+", "_", slug).strip("_")
+    return slug or "default"
 
 
 def find_workspace_root(start_path: str | Path = ".") -> Path:

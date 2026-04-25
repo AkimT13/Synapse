@@ -73,8 +73,8 @@ def run_doctor(
     db_error = None
     if actian_installed:
         try:
-            with VectorStore() as store:
-                store.client.collections.exists("chunks")
+            with VectorStore(collection=workspace.collection_name) as store:
+                store.client.collections.exists(store.collection)
             db_reachable = True
         except Exception as exc:  # noqa: BLE001
             db_error = str(exc)

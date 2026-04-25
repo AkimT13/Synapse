@@ -127,7 +127,7 @@ def test_cli_status_outputs_workspace_summary(
 
     monkeypatch.setattr(
         "synapse_cli.status_command._get_db_status",
-        lambda: __import__("synapse_cli.status_command", fromlist=["DbStatus"]).DbStatus(
+        lambda collection_name: __import__("synapse_cli.status_command", fromlist=["DbStatus"]).DbStatus(
             actian_installed=True,
             reachable=False,
             error="connection refused",
@@ -165,7 +165,7 @@ def test_cli_status_json_outputs_machine_readable_payload(
 
     monkeypatch.setattr(
         "synapse_cli.status_command._get_db_status",
-        lambda: __import__("synapse_cli.status_command", fromlist=["DbStatus"]).DbStatus(
+        lambda collection_name: __import__("synapse_cli.status_command", fromlist=["DbStatus"]).DbStatus(
             actian_installed=False,
             reachable=False,
             error="Actian VectorAI client is not installed",

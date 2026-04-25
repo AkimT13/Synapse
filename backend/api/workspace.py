@@ -106,8 +106,8 @@ async def reset_workspace(
         shutil.rmtree(directory, ignore_errors=True)
         directory.mkdir(parents=True, exist_ok=True)
 
-    if store.client.collections.exists("chunks"):
-        store.client.collections.delete("chunks")
+    if store.client.collections.exists(store.collection):
+        store.client.collections.delete(store.collection)
     store.ensure_collection(models.get_config().embedding_dimension)
 
     await chat_store.clear_all()

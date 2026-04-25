@@ -25,7 +25,7 @@ def run_status(
     except FileNotFoundError as exc:
         return 2, str(exc)
 
-    db_status = _get_db_status()
+    db_status = _get_db_status(workspace.collection_name)
     payload = _build_status_payload(workspace, db_status)
 
     if as_json:
@@ -34,7 +34,7 @@ def run_status(
     return 0, _render_text_status(payload)
 
 
-def _get_db_status() -> DbStatus:
+def _get_db_status(collection_name: str) -> DbStatus:
     if not actian_available():
         return DbStatus(
             actian_installed=False,
@@ -43,8 +43,8 @@ def _get_db_status() -> DbStatus:
         )
 
     try:
-        with VectorStore() as store:
-            store.client.collections.exists("chunks")
+        with VectorStore(collection=workspace.collection_name) as store:
+            store.client.collections.exists(store.collection)
         return DbStatus(actian_installed=True, reachable=True)
     except Exception as exc:  # noqa: BLE001 - status should surface failures
         return DbStatus(

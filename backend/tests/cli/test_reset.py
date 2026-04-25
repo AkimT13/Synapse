@@ -22,7 +22,7 @@ def test_cli_reset_deletes_existing_collection(
     exit_code = main(["reset", "--repo-root", str(repo_root)])
 
     assert exit_code == 0
-    assert "Reset collection 'chunks'" in capsys.readouterr().out
+    assert "Reset collection 'reset_demo_chunks'" in capsys.readouterr().out
 
 
 def test_cli_reset_json_reports_missing_collection(
@@ -54,6 +54,9 @@ def test_cli_reset_returns_error_when_workspace_missing(
 
 
 class _DeletingVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _DeletingVectorStore:
         return self
 
@@ -65,6 +68,9 @@ class _DeletingVectorStore:
 
 
 class _NoopVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _NoopVectorStore:
         return self
 

@@ -34,7 +34,7 @@ def run_ingest(
         progress_sink(message)
 
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             if target in ("all", "code"):
                 for root in workspace.code_roots:
                     on_progress(f"[code] starting {root.path}")

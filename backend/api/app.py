@@ -41,7 +41,8 @@ async def lifespan(app: FastAPI):
         init_models_from_workspace(workspace)
         app.state.workspace_config = workspace
 
-    store = VectorStore()
+    collection = workspace.collection_name if workspace else "chunks"
+    store = VectorStore(collection=collection)
     store.connect()
     app.state.vector_store = store
 

@@ -122,6 +122,9 @@ def test_cli_watch_json_outputs_machine_readable_payload(
 
 
 class _DummyVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _DummyVectorStore:
         return self
 

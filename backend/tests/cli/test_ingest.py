@@ -88,6 +88,9 @@ def test_cli_ingest_returns_error_when_workspace_missing(
 
 
 class _DummyVectorStore:
+    def __init__(self, **kwargs):
+        pass
+
     def __enter__(self) -> _DummyVectorStore:
         return self
 

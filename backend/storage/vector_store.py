@@ -273,6 +273,10 @@ class VectorStore:
         self.close()
 
     @property
+    def collection(self) -> str:
+        return self._collection
+
+    @property
     def client(self) -> VectorAIClient:
         if self._client is None:
             raise RuntimeError(

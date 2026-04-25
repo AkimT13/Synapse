@@ -29,7 +29,7 @@ def run_query(
     init_models_from_workspace(workspace)
 
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             if mode == "free":
                 result = answer_question(
                     question=text,

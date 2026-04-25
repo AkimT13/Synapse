@@ -62,7 +62,7 @@ def run_watch(
 
     cycles = 0
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             while True:
                 now = time.monotonic()
                 for target in targets:

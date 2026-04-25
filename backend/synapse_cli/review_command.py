@@ -30,7 +30,7 @@ def run_review(
         return 1, str(exc)
 
     try:
-        with VectorStore() as store:
+        with VectorStore(collection=workspace.collection_name) as store:
             drift = [
                 _serialize_drift_entry(_run_single_check(check=check, store=store, k=k))
                 for check in checks
