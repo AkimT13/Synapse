@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 import json as _json
 import sys
+import warnings
+
+warnings.filterwarnings("ignore", message="Search on .* returned no results")
 from pathlib import Path
 
 from synapse_cli.drift_check_command import run_drift_check
