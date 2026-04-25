@@ -1,88 +1,155 @@
 # Synapse
 
-Your code and your documentation, searchable as one thing.
+Developers don't always know the spec. Researchers don't always read the code. Synapse bridges both sides.
 
-Highlight a function and Synapse surfaces the spec behind it. Highlight
-a passage in a doc and it finds the code that implements it. Ask a
-question in plain English and it answers across both, with citations.
+Synapse ingests your domain knowledge — research papers, protocol documents, safety specifications — alongside your source code, and continuously checks whether the two are aligned. When a developer writes a threshold that violates a constraint buried on page 47 of a spec, Synapse catches it. When a researcher updates a protocol, Synapse flags every function that may now be out of compliance.
 
-Everything runs locally — point it at a repository and a folder of
-docs and they become searchable together. Works with OpenAI or a
-local [Ollama](https://ollama.com) install.
+Point it at a repository and a folder of docs and they become searchable together. Highlight a function and Synapse surfaces the spec behind it. Highlight a passage in a doc and it finds the code that implements it. Ask a question in plain English and it answers across both, with citations.
 
-Built for the Actian VectorAI hackathon.
+Works with OpenAI or a local [Ollama](https://ollama.com) install. Built for the Actian VectorAI hackathon.
 
-## What you'll need
-
-- **Docker**, to run the Actian VectorAI database
-- **Python 3.10+** and **Node 18+**
-- An **OpenAI API key** *or* a local **Ollama** install
-- A few minutes and something to ingest — a small repo and a handful
-  of PDFs/Markdown files is plenty. The `sample/` directory has a
-  starter corpus if you just want to look around.
-
-## Running the demo
-
-### 1. Actian VectorAI DB
+## Quick install
 
 ```bash
-cd backend
-docker-compose up -d         # starts the Actian DB on localhost:50051
+git clone https://github.com/AkimT13/Synapse.git && cd Synapse && bash install.sh
 ```
 
-Or, once the CLI is installed:
+This sets up the Python venv, installs the backend + CLI, and installs
+frontend dependencies.
+
+## Prerequisites
+
+- **Python 3.10+** and **Node 18+**
+- **Docker**, to run the Actian VectorAI database
+- **Actian VectorAI Python client** (`.whl` file — see below)
+- An **OpenAI API key** *or* a local **Ollama** install
+
+## Setup
+
+### 1. Actian VectorAI client
+
+The Actian Python client is distributed as a `.whl` file and is not on
+PyPI. Place the wheel in the `backend/` directory, then install it:
+
+```bash
+cp /path/to/actian_vectorai-0.1.0b2-py3-none-any.whl backend/
+source backend/.venv/bin/activate
+pip install backend/actian_vectorai-0.1.0b2-py3-none-any.whl
+```
+
+> The `.whl` is gitignored. Each developer needs to obtain and install
+> it locally.
+
+### 2. Start the vector database
 
 ```bash
 synapse services up
 ```
 
-Synapse manages its local runtime scaffold under `.synapse/runtime/`. That
-directory is local workspace state, not project config.
+This starts the Actian VectorAI DB on `localhost:50051` via Docker.
 
-### 2. Backend API (port 8000)
+### 3. Initialize a workspace
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate    # Windows: .venv\Scripts\activate
-pip install -e backend
-pip install -r backend/requirements-actian.txt
-
-cp backend/.env.example backend/.env
-# Edit .env and set OPENAI_API_KEY 
-# (see "Picking models and providers" below if you want to swap
-# OpenAI for local Ollama, or change models).
-
-python -m api.app         
+synapse init
 ```
 
-`pip install -e backend` now installs the general backend and CLI dependencies.
-The Actian Python client is installed separately from the bundled wheel via
-`backend/requirements-actian.txt` so editable installs remain portable across
-machines.
+Follow the prompts to set your workspace name, code paths, knowledge
+paths, and model provider. This creates `.synapse/config.yaml`.
 
-### 3. Frontend (port 3000)
+### 4. Configure your models
+
+Set your API key in `.synapse/.env`:
 
 ```bash
+echo "OPENAI_API_KEY=sk-..." > .synapse/.env
+```
+
+Or use Ollama (no API key needed):
+
+```bash
+ollama serve
+ollama pull llama3.2:3b
+ollama pull nomic-embed-text
+```
+
+When running `synapse init`, select Ollama as your provider.
+
+### 5. Ingest your data
+
+```bash
+synapse ingest
+```
+
+This parses your code and knowledge, normalizes, embeds, and stores
+everything in the vector database. Each workspace gets its own
+isolated collection.
+
+### 6. Verify
+
+```bash
+synapse doctor
+```
+
+All checks should pass. You're ready to go.
+
+## Usage
+
+### CLI
+
+```bash
+synapse status                # workspace overview
+synapse query free "How does the threshold work?"
+synapse drift-check --file ./code/my_module.py
+synapse review --file ./code/my_module.py
+synapse reset                 # wipe this workspace's vectors
+synapse reindex               # reset + re-ingest
+```
+
+### GUI (port 3000 + 8000)
+
+Start the backend API and frontend dev server:
+
+```bash
+# Terminal 1 — API
+source backend/.venv/bin/activate
+python -m api.app
+
+# Terminal 2 — Frontend
 cd frontend
-npm install
-cp .env.local.example .env.local   # picks up NEXT_PUBLIC_API_BASE
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and click **Launch the
-demo** to land on the onboarding page. Upload the sample corpora
-(`sample/code` and `sample/knowledge`) or your own code & documents.
+Open [http://localhost:3000](http://localhost:3000).
+
+### VS Code extension
+
+```bash
+synapse vscode
+```
+
+Builds the extension and opens VS Code with it loaded. The extension
+provides drift checks, review, and query directly in the editor.
+Requires the venv to be active so `synapse` is on PATH.
+
+### Agent skills (Claude Code / Codex)
+
+```bash
+synapse install-skill
+```
+
+Installs a `synapse-review` skill that AI coding agents use
+automatically when editing domain-relevant code. The agent runs
+`synapse review` before and after edits to check for drift.
 
 ## Picking models and providers
 
-Synapse supports two providers for both chat and embeddings: **OpenAI**
-(hosted) and **Ollama** (local, `http://localhost:11434`). Chat and
-embeddings are configured independently — you can mix providers, e.g.
-OpenAI chat with Ollama embeddings.
+Synapse supports **OpenAI** (hosted) and **Ollama** (local) for both
+chat and embeddings. They're configured independently — you can mix
+providers.
 
-Configured via environment variables in `backend/.env` (see
-[`backend/.env.example`](backend/.env.example) for the full list with
-comments):
+Configured via `.synapse/config.yaml` (created by `synapse init`) or
+environment variables in `.synapse/.env`:
 
 | Variable              | Default                      | Options                  |
 | --------------------- | ---------------------------- | ------------------------ |
@@ -97,42 +164,30 @@ comments):
 `EMBEDDING_DIMENSION` must match the embedding model — e.g. `3072` for
 `text-embedding-3-large`, `1536` for `text-embedding-3-small`, `768`
 for Ollama's `nomic-embed-text`. If you change the embedding model
-after ingesting, reset the workspace (top-right of the onboarding
-page) so the vector collection is recreated at the new dimension.
+after ingesting, run `synapse reindex` so the collection is recreated
+at the new dimension.
 
-Ollama doesn't need an API key — just run `ollama serve` and pull the
-models you want (e.g. `ollama pull llama3.1:8b`,
-`ollama pull nomic-embed-text`).
+## Workspace isolation
 
-## CLI
+Each workspace gets its own vector DB collection derived from its name.
+A project named `"eeg-analysis"` stores vectors in `eeg_analysis_chunks`,
+while `"my-project"` uses `my_project_chunks`. Running `synapse reset`
+in one project does not affect another.
 
-The preferred CLI entrypoint is `synapse`.
+## Sample data
 
-From the repo root:
+The `sample/` directory contains a starter corpus (EEG neuroscience)
+with code and knowledge files you can use to try things out. There's
+also an `aerospace-sample/` with flight dynamics and GNC content.
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e backend
-pip install -r backend/requirements-actian.txt
-```
+## Architecture
 
-Then use:
+Five-stage pipeline with full provenance tracking:
 
-```bash
-synapse doctor
-synapse ingest
-synapse query free "How is the spike detection threshold set?"
-synapse drift-check --file ./sample/code/bad_spike_pipeline.py
-```
+1. **Ingestion** — Parse raw documents (PDF, DOCX, MD) and code (Python via tree-sitter)
+2. **Normalization** — Extract semantic structure (constraints, behaviors, procedures) with optional LLM rewrite
+3. **Embedding** — Vectorize normalized text (L2-normalized)
+4. **Storage** — Persist to Actian VectorAI DB with metadata for filtered retrieval
+5. **Retrieval** — Direction-aware KNN search + LLM explanation
 
-## Multi-agent Development
-
-Synapse's default parallel delivery model is a hub-and-spoke multi-agent loop.
-
-- `MULTI_AGENT_WORKFLOW.md` defines the operating rules
-- `MULTI_AGENT_STATUS.md` is the live cycle contract and status log
-- `AGENT_INTEGRATION.md` covers the CLI commands agents should use
-
-Before starting a long-running coordinated agent session, create a sentinel
-commit so the loop has a clear rollback anchor.
+See `pipeline.mermaid` for a detailed sequence diagram.
