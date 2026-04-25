@@ -43,7 +43,7 @@ def _get_db_status(collection_name: str) -> DbStatus:
         )
 
     try:
-        with VectorStore(collection=workspace.collection_name) as store:
+        with VectorStore(collection=collection_name) as store:
             store.client.collections.exists(store.collection)
         return DbStatus(actian_installed=True, reachable=True)
     except Exception as exc:  # noqa: BLE001 - status should surface failures

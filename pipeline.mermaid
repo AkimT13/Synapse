@@ -1,144 +1,16 @@
-%% Synapse Pipeline — Ingestion & Retrieval
-%% ==========================================
+%% Synapse Pipeline
 
-sequenceDiagram
-    autonumber
-
-    participant User
-    participant CLI as CLI / API
-    participant Walker as File Walker
-    participant Parser as Parser<br/>(Code / Knowledge)
-    participant Normalizer as Normalizer<br/>(Code / Knowledge)
-    participant LLM as LLM<br/>(optional rewrite)
-    participant Embedder as Embedding Service
-    participant Store as VectorStore<br/>(Actian VectorAI)
-
-    %% ═══════════════════════════════════════
-    %% INGESTION PIPELINE
-    %% ═══════════════════════════════════════
-
-    rect rgb(88, 28, 135)
-        Note over User, Store: INGESTION — synapse ingest
+graph LR
+    subgraph Ingestion
+        A1[Code Files<br/>Python] -->|tree-sitter| B1[RawCodeChunks]
+        A2[Knowledge Docs<br/>PDF, DOCX, MD] -->|docling| B2[RawKnowledgeChunks]
     end
 
-    User ->> CLI: synapse ingest (code / knowledge / all)
-    CLI ->> CLI: load_workspace_config()<br/>resolve roots, models, collection name
+    B1 --> C[Normalization<br/>kind · keywords · embed_text]
+    B2 --> C
 
-    %% ── Code path ──
-    rect rgb(30, 30, 60)
-        Note over Walker, Parser: Code Ingestion
-        CLI ->> Walker: walk_repository(repo_path, languages)
-        Walker ->> Walker: discover files by extension<br/>compute module paths (dotted)
-        Walker ->> Parser: parse_file(source, file_path, module_path)
-        Note right of Parser: Tree-sitter CST parse<br/>extract top-level functions<br/>+ direct class methods
-        Parser ->> Parser: per function extract:<br/>• kind (property/classmethod/...)<br/>• signature, parameters, return type<br/>• docstring, decorators<br/>• calls, raises, imports<br/>• line_range
-        Parser -->> Walker: list[RawCodeChunk]
-        Walker -->> CLI: all RawCodeChunks
-    end
+    C --> D[Embedding<br/>L2-normalized vectors]
 
-    %% ── Knowledge path ──
-    rect rgb(10, 50, 50)
-        Note over Walker, Parser: Knowledge Ingestion
-        CLI ->> Walker: parse_directory(dir_path)
-        Walker ->> Parser: DocumentConverter(PDF, DOCX, MD, ...)
-        Parser ->> Parser: docling structured parse<br/>→ document tree
-        Parser ->> Parser: HybridChunker<br/>• section headings<br/>• page numbers<br/>• content type (text/table/figure)<br/>• named entities, units
-        Parser -->> CLI: list[RawDocumentChunk]
-    end
+    D --> E[(Actian VectorAI<br/>cosine KNN + metadata filters)]
 
-    %% ── Normalization ──
-    rect rgb(50, 30, 10)
-        Note over Normalizer, LLM: Normalization
-        CLI ->> Normalizer: normalize_batch(raw_chunks)
-
-        Normalizer ->> Normalizer: kind inference (pattern match)<br/>constraint / behavior / procedure /<br/>definition / mapping / unknown
-
-        Normalizer ->> Normalizer: build deterministic template<br/>Code: "Python {kind} `{name}` in<br/>module `{path}` ..."<br/>Knowledge: section + page +<br/>content type context
-
-        Normalizer ->> Normalizer: extract keywords<br/>Code: name tokens, types, imports<br/>Knowledge: entities, units, headings
-
-        alt has domain signals & should_use_llm
-            Normalizer ->> LLM: rewrite template → domain prose
-            Note right of LLM: Code: "Technical writer<br/>specializing in<br/>domain terminology"<br/>Knowledge: "Connect domain<br/>knowledge to software<br/>implications"
-            LLM -->> Normalizer: refined embed_text (2-5 sentences)
-        else skip LLM (dunders, tests, short text, no signals)
-            Normalizer ->> Normalizer: use template as embed_text
-        end
-
-        Normalizer -->> CLI: list[NormalizedChunk]<br/>carries full RawChunk provenance
-    end
-
-    %% ── Embedding ──
-    rect rgb(10, 30, 50)
-        Note over Embedder: Embedding
-        CLI ->> Embedder: embed_batch(normalized_chunks)
-        Embedder ->> Embedder: batch texts (≤100 per call)
-        Embedder ->> Embedder: models.embed(texts)<br/>→ vector per chunk
-        Embedder ->> Embedder: L2-normalize each vector
-        Embedder -->> CLI: list[EmbeddedChunk]<br/>full provenance: Raw → Norm → Embed
-    end
-
-    %% ── Storage ──
-    rect rgb(20, 20, 20)
-        Note over Store: Storage
-        CLI ->> Store: ensure_collection(dimension)<br/>collection = "{workspace}_chunks"
-        CLI ->> Store: upsert(embedded_chunks)
-        Store ->> Store: to_storage_record() per chunk:<br/>• chunk_type (code/knowledge)<br/>• _raw (full chunk, no vector)<br/>• top-level filter fields:<br/>  knowledge: domain, knowledge_type,<br/>  contains_constraint, confidence<br/>  code: language, module_path
-        Store ->> Store: SmartBatcher (size=5, 512KB)<br/>retry failed batches item-by-item
-        Store -->> CLI: stored count
-    end
-
-    CLI -->> User: summary (files, parsed, stored, errors)
-
-    %% ═══════════════════════════════════════
-    %% RETRIEVAL PIPELINE
-    %% ═══════════════════════════════════════
-
-    rect rgb(6, 95, 70)
-        Note over User, Store: RETRIEVAL — synapse query / drift-check / review
-    end
-
-    User ->> CLI: query or drift-check
-
-    %% ── Query embedding ──
-    CLI ->> Embedder: embed_single(query_text)
-    Embedder -->> CLI: query vector
-
-    %% ── Direction-aware search ──
-    alt code → knowledge (drift-check)
-        CLI ->> Store: search(vector, k,<br/>filter: chunk_type=knowledge,<br/>contains_constraint=true)
-        Note right of Store: cosine KNN<br/>+ metadata filter
-        Store -->> CLI: constraint results
-        alt no constraints found (fallback)
-            CLI ->> Store: search(vector, k,<br/>filter: chunk_type=knowledge)
-            Store -->> CLI: general knowledge results
-        end
-    else knowledge → code
-        CLI ->> Store: search(vector, k,<br/>filter: chunk_type=code)
-        Store -->> CLI: code results
-    else free-text query
-        CLI ->> Store: search(vector, k, filter: knowledge)
-        CLI ->> Store: search(vector, k, filter: code)
-        CLI ->> CLI: merge + sort by score → top k
-    end
-
-    %% ── Filter by score threshold ──
-    CLI ->> CLI: filter results by score_threshold
-
-    %% ── LLM explanation ──
-    rect rgb(50, 30, 10)
-        Note over CLI, LLM: LLM Explanation
-        alt drift-check mode
-            CLI ->> LLM: "Does this code align<br/>with these constraints?"
-            LLM -->> CLI: explanation + conflict signals<br/>(violates/incorrect/exceeds/...)
-            CLI ->> CLI: detect conflict vs consistent
-        else coverage mode
-            CLI ->> LLM: "Is this constraint<br/>implemented in code?"
-            LLM -->> CLI: explanation + implementation signals<br/>(implements/enforces/validates/...)
-        else free-text mode
-            CLI ->> LLM: "Answer using context,<br/>cite with [N]"
-            LLM -->> CLI: answer with citations
-        end
-    end
-
-    CLI -->> User: results + explanation +<br/>status (aligned/warning/conflict)
+    E --> F[Retrieval<br/>code↔knowledge search + LLM explanation]
